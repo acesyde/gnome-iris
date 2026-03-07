@@ -1,0 +1,1 @@
+//! Shader sync worker.

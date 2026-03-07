@@ -1,0 +1,62 @@
+[package]
+name = "gnome-iris"
+version = "0.1.0"
+edition = "2024"
+description = "ReShade manager for Wine/Proton games on Linux"
+license = "GPL-2.0"
+
+[lints.clippy]
+complexity  = "deny"
+correctness = "deny"
+nursery     = "deny"
+pedantic    = "deny"
+perf        = "deny"
+style       = "deny"
+suspicious  = "deny"
+module_name_repetitions = "deny"
+
+[lints.rust]
+missing_docs = "deny"
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[dependencies]
+anyhow = "1"
+derive_more = { version = "2", features = ["full"] }
+directories = "6"
+env_logger = "0.11"
+log = "0.4"
+
+i18n-embed    = { version = "0.16", features = ["desktop-requester", "fluent", "fluent-system"] }
+i18n-embed-fl = "0.10"
+
+relm4 = { git = "https://github.com/relm4/relm4", rev = "baa1c23ab35e3b8c4117714042671f7ed02aeabb", default-features = false, features = ["adw", "css", "gnome_49", "macros"] }
+relm4-components = { git = "https://github.com/relm4/relm4", rev = "baa1c23ab35e3b8c4117714042671f7ed02aeabb", features = ["libadwaita"] }
+relm4-icons = "0.10"
+
+rust-embed = "8"
+serde      = { version = "1", features = ["serde_derive"] }
+serde_json = "1"
+sha2       = "0.10"
+tokio      = { version = "1", features = ["macros", "rt", "sync"] }
+
+# Domain-specific
+reqwest          = { version = "0.12", features = ["stream"] }
+git2             = "0.19"
+keyvalues-parser = "0.2"
+sevenz-rust      = "0.6"
+zip              = "2"
+regex            = "1"
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+glib-build-tools  = "0.21"
+relm4-icons-build = "0.10"
