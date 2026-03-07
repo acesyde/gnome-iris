@@ -1,0 +1,30 @@
+"libraryfolders"
+{
+	"0"
+	{
+		"path"		"/home/user/.local/share/Steam"
+		"label"		""
+		"contentid"		"1234567890"
+		"totalsize"		"500000000000"
+		"update_clean_bytes_tally"		"0"
+		"time_last_update_corruption"		"0"
+		"apps"
+		{
+			"570"		"8000000"
+			"730"		"15000000"
+		}
+	}
+	"1"
+	{
+		"path"		"/mnt/games/Steam"
+		"label"		"Games Drive"
+		"contentid"		"9876543210"
+		"totalsize"		"2000000000000"
+		"update_clean_bytes_tally"		"0"
+		"time_last_update_corruption"		"0"
+		"apps"
+		{
+			"379720"		"40000000"
+		}
+	}
+}
