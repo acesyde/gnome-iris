@@ -2,8 +2,6 @@
 //!
 //! GTK4 + Relm4 GUI for managing ReShade under Wine/Proton on Linux.
 
-#![feature(never_type)]
-
 use std::io::Write;
 
 use anyhow::Result;
