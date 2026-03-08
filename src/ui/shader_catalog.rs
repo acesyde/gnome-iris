@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, SimpleComponent, adw, gtk};
 
+use crate::fl;
 use crate::reshade::catalog::{CatalogEntry, KNOWN_REPOS};
 use crate::reshade::config::ShaderRepo;
 
@@ -13,6 +14,8 @@ use crate::reshade::config::ShaderRepo;
 pub struct ShaderCatalogInit {
     /// Base data directory (e.g. `~/.local/share/iris/`).
     pub data_dir: PathBuf,
+    /// Custom repos from config (those not in KNOWN_REPOS) to pre-populate.
+    pub custom_repos: Vec<ShaderRepo>,
 }
 
 /// Shader catalog component model.
@@ -25,19 +28,27 @@ pub struct ShaderCatalog {
     syncing: Option<String>,
     /// Download buttons keyed by `local_name` (only for not-yet-installed repos).
     row_buttons: HashMap<String, gtk::Button>,
+    /// The "Custom Repositories" group — stored for dynamic row insertion.
+    custom_group: adw::PreferencesGroup,
 }
 
 /// Input messages for [`ShaderCatalog`].
 #[derive(Debug)]
 pub enum Controls {
-    /// User clicked the download button for an entry.
+    /// User clicked the download button for a known catalog entry.
     DownloadRepo(&'static CatalogEntry),
+    /// Window confirmed a new custom repo — add a row to the custom group.
+    AddCustomRepo(ShaderRepo),
+    /// User clicked download on a custom repo row.
+    DownloadCustomRepo(ShaderRepo),
     /// Progress message forwarded from the shader worker.
     SyncProgress(String),
     /// The worker finished syncing the in-flight repo successfully.
     SyncComplete,
     /// The worker failed to sync the in-flight repo.
     SyncError(String),
+    /// The "+" button was clicked — window should open the add-repo dialog.
+    AddCustomRepoRequested,
 }
 
 /// Output signals from [`ShaderCatalog`].
@@ -45,6 +56,8 @@ pub enum Controls {
 pub enum Signal {
     /// User wants to download this repo — parent should forward to the worker.
     DownloadRequested(ShaderRepo),
+    /// User clicked the "+" button — window should open the add-repo dialog.
+    AddCustomRepoRequested,
 }
 
 #[allow(missing_docs)]
@@ -70,6 +83,11 @@ impl SimpleComponent for ShaderCatalog {
                          Use the game detail pane to enable them per game."
                     ),
                 },
+
+                #[name(custom_group)]
+                adw::PreferencesGroup {
+                    set_title: "Custom Repositories",
+                },
             },
         }
     }
@@ -80,20 +98,29 @@ impl SimpleComponent for ShaderCatalog {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let repos_dir = init.data_dir.join("ReShade_shaders");
-        let installed: HashSet<String> = KNOWN_REPOS
+
+        let mut installed: HashSet<String> = KNOWN_REPOS
             .iter()
             .filter(|e| repos_dir.join(e.local_name).is_dir())
             .map(|e| e.local_name.to_owned())
             .collect();
+        for repo in &init.custom_repos {
+            if repos_dir.join(&repo.local_name).is_dir() {
+                installed.insert(repo.local_name.clone());
+            }
+        }
 
         let mut model = Self {
             data_dir: init.data_dir,
             installed,
             syncing: None,
             row_buttons: HashMap::new(),
+            custom_group: adw::PreferencesGroup::new(),
         };
 
         let widgets = view_output!();
+
+        model.custom_group = widgets.custom_group.clone();
 
         // Build one ActionRow per catalog entry.
         for entry in KNOWN_REPOS {
@@ -124,6 +151,46 @@ impl SimpleComponent for ShaderCatalog {
             widgets.catalog_group.add(&row);
         }
 
+        // Attach the "+" button to the custom group header.
+        let add_btn = gtk::Button::from_icon_name("list-add-symbolic");
+        add_btn.set_valign(gtk::Align::Center);
+        add_btn.add_css_class("flat");
+        add_btn.set_tooltip_text(Some(&fl!("add-custom-repo")));
+        {
+            let s = sender.clone();
+            add_btn.connect_clicked(move |_| s.input(Controls::AddCustomRepoRequested));
+        }
+        widgets.custom_group.set_header_suffix(Some(&add_btn));
+
+        // Pre-populate custom repos.
+        for repo in &init.custom_repos {
+            let row = adw::ActionRow::new();
+            row.set_title(&repo.local_name);
+            row.set_subtitle(&repo.url);
+            let is_installed = model.installed.contains(&repo.local_name);
+            let btn = gtk::Button::from_icon_name(if is_installed {
+                "emblem-default-symbolic"
+            } else {
+                "folder-download-symbolic"
+            });
+            btn.set_valign(gtk::Align::Center);
+            btn.add_css_class("flat");
+            btn.set_sensitive(!is_installed);
+            if !is_installed {
+                btn.set_tooltip_text(Some("Download"));
+                let s = sender.clone();
+                let repo_clone = repo.clone();
+                btn.connect_clicked(move |_| {
+                    s.input(Controls::DownloadCustomRepo(repo_clone.clone()))
+                });
+                model.row_buttons.insert(repo.local_name.clone(), btn.clone());
+            } else {
+                btn.set_tooltip_text(Some("Downloaded"));
+            }
+            row.add_suffix(&btn);
+            widgets.custom_group.add(&row);
+        }
+
         ComponentParts { model, widgets }
     }
 
@@ -140,6 +207,46 @@ impl SimpleComponent for ShaderCatalog {
                 sender
                     .output(Signal::DownloadRequested(entry.to_shader_repo()))
                     .ok();
+            }
+            Controls::AddCustomRepoRequested => {
+                sender.output(Signal::AddCustomRepoRequested).ok();
+            }
+            Controls::AddCustomRepo(repo) => {
+                let row = adw::ActionRow::new();
+                row.set_title(&repo.local_name);
+                row.set_subtitle(&repo.url);
+                let is_installed = self.installed.contains(&repo.local_name);
+                let btn = gtk::Button::from_icon_name(if is_installed {
+                    "emblem-default-symbolic"
+                } else {
+                    "folder-download-symbolic"
+                });
+                btn.set_valign(gtk::Align::Center);
+                btn.add_css_class("flat");
+                btn.set_sensitive(!is_installed);
+                if !is_installed {
+                    btn.set_tooltip_text(Some("Download"));
+                    let s = sender.clone();
+                    let repo_clone = repo.clone();
+                    btn.connect_clicked(move |_| {
+                        s.input(Controls::DownloadCustomRepo(repo_clone.clone()))
+                    });
+                    self.row_buttons.insert(repo.local_name.clone(), btn.clone());
+                } else {
+                    btn.set_tooltip_text(Some("Downloaded"));
+                }
+                row.add_suffix(&btn);
+                self.custom_group.add(&row);
+            }
+            Controls::DownloadCustomRepo(repo) => {
+                if self.syncing.is_some() {
+                    return;
+                }
+                self.syncing = Some(repo.local_name.clone());
+                if let Some(btn) = self.row_buttons.get(&repo.local_name) {
+                    btn.set_sensitive(false);
+                }
+                sender.output(Signal::DownloadRequested(repo)).ok();
             }
             Controls::SyncProgress(msg) => {
                 log::debug!("Shader sync: {msg}");

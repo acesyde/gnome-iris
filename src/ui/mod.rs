@@ -2,6 +2,7 @@
 
 pub mod about;
 pub mod add_game_dialog;
+pub mod add_shader_repo_dialog;
 pub mod game_detail;
 pub mod game_list;
 pub mod game_shader_overrides;
