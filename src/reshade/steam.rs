@@ -65,7 +65,8 @@ pub fn discover_steam_games() -> Vec<Game> {
 
 /// Parses a single `appmanifest_<id>.acf` file.
 ///
-/// Returns `Some(Game)` only when the manifest declares `type = "Game"`.
+/// Returns `Some(Game)` only for actual games, filtering out Proton versions,
+/// Steam Linux Runtime, and other tools by name/installdir patterns.
 fn parse_appmanifest(acf_path: &Path, steamapps: &Path) -> Option<Game> {
     let content = std::fs::read_to_string(acf_path).ok()?;
     let vdf = keyvalues_parser::parse(&content).ok()?;
@@ -78,22 +79,32 @@ fn parse_appmanifest(acf_path: &Path, steamapps: &Path) -> Option<Game> {
             .map(|s| s.to_owned())
     };
 
-    // Only include actual games, not tools/runtimes.
-    let app_type = get("type").unwrap_or_default();
-    if !app_type.eq_ignore_ascii_case("game") {
-        return None;
-    }
-
     let name = get("name")?;
     let install_dir = get("installdir")?;
     let app_id: u32 = get("appid").and_then(|s| s.parse().ok()).unwrap_or(0);
-    let path = steamapps.join("common").join(install_dir);
 
+    // Filter out Proton versions and Steam Linux Runtime tools.
+    if is_steam_tool(&name, &install_dir) {
+        return None;
+    }
+
+    let path = steamapps.join("common").join(&install_dir);
     if !path.exists() {
         return None;
     }
 
     Some(Game::new(name, path, GameSource::Steam { app_id }))
+}
+
+/// Returns `true` if the name/installdir matches known Steam tool patterns
+/// (Proton versions, Steam Linux Runtime, etc.) rather than an actual game.
+fn is_steam_tool(name: &str, install_dir: &str) -> bool {
+    let name_lower = name.to_ascii_lowercase();
+    let dir_lower = install_dir.to_ascii_lowercase();
+    name_lower.starts_with("proton")
+        || name_lower.starts_with("steam linux runtime")
+        || dir_lower.starts_with("proton")
+        || dir_lower.starts_with("steamlinuxruntime")
 }
 
 /// Detects the architecture of a PE `.exe` by reading its header bytes.
