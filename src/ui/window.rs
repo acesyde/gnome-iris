@@ -41,6 +41,8 @@ pub struct Window {
     add_shader_repo_dialog: relm4::Controller<add_shader_repo_dialog::AddShaderRepoDialog>,
     /// Navigation view — used to push game detail page.
     nav_view: adw::NavigationView,
+    /// Toast overlay — used to surface brief error/info messages.
+    toast_overlay: adw::ToastOverlay,
 }
 
 /// Input messages for [`Window`].
@@ -101,7 +103,7 @@ impl Component for Window {
             set_default_height: 700,
 
             #[local_ref]
-            nav_view -> adw::NavigationView {},
+            toast_overlay -> adw::ToastOverlay {},
         }
     }
 
@@ -250,6 +252,9 @@ impl Component for Window {
         let nav_view = adw::NavigationView::new();
         nav_view.push(&home_page);
 
+        // Wrap in a ToastOverlay so we can surface brief notifications.
+        let toast_overlay = adw::ToastOverlay::new();
+
         let model = Self {
             app_state,
             games,
@@ -261,10 +266,14 @@ impl Component for Window {
             shader_worker,
             add_shader_repo_dialog,
             nav_view: nav_view.clone(),
+            toast_overlay: toast_overlay.clone(),
         };
 
         let nav_view = &nav_view;
+        let toast_overlay = &toast_overlay;
         let widgets = view_output!();
+        // Wire nav_view as the toast overlay's child (must be done after view_output!).
+        widgets.toast_overlay.set_child(Some(nav_view));
 
         ComponentParts { model, widgets }
     }
@@ -362,17 +371,29 @@ impl Component for Window {
                 self.add_shader_repo_dialog.widget().present(Some(root));
             }
             Controls::ShaderRepoAdded(repo) => {
+                let in_catalog = crate::reshade::catalog::KNOWN_REPOS
+                    .iter()
+                    .any(|e| e.url == repo.url || e.local_name == repo.local_name);
+                if in_catalog {
+                    self.toast_overlay.add_toast(adw::Toast::new(
+                        "This repository is already in the known catalog.",
+                    ));
+                    return;
+                }
                 let already = self
                     .app_state
                     .config
                     .shader_repos
                     .iter()
-                    .any(|r| r.local_name == repo.local_name);
-                if !already {
-                    self.app_state.config.shader_repos.push(repo.clone());
-                    if let Err(e) = self.app_state.save() {
-                        log::error!("Failed to save config after adding custom repo: {e}");
-                    }
+                    .any(|r| r.url == repo.url || r.local_name == repo.local_name);
+                if already {
+                    self.toast_overlay
+                        .add_toast(adw::Toast::new("This repository has already been added."));
+                    return;
+                }
+                self.app_state.config.shader_repos.push(repo.clone());
+                if let Err(e) = self.app_state.save() {
+                    log::error!("Failed to save config after adding custom repo: {e}");
                 }
                 self.shader_catalog
                     .emit(shader_catalog::Controls::AddCustomRepo(repo));
