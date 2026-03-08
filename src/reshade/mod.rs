@@ -4,6 +4,7 @@
 
 pub mod app_state;
 pub mod cache;
+pub mod catalog;
 pub mod config;
 pub mod game;
 pub mod install;

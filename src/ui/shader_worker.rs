@@ -19,6 +19,13 @@ pub enum Controls {
         /// Repo `local_name`s to exclude from the merge.
         disabled_repos: Vec<String>,
     },
+    /// Clone/update a single repo without rebuilding the Merged directory.
+    SyncOne {
+        /// Repo to sync.
+        repo: ShaderRepo,
+        /// Base data directory containing `ReShade_shaders/`.
+        data_dir: PathBuf,
+    },
 }
 
 /// Output signals from the shader worker.
@@ -85,6 +92,28 @@ impl Worker for ShaderWorker {
                     return;
                 }
                 sender.output(Signal::Complete).ok();
+            }
+            Controls::SyncOne { repo, data_dir } => {
+                let repos_dir = data_dir.join("ReShade_shaders");
+                if let Err(e) = std::fs::create_dir_all(&repos_dir) {
+                    sender.output(Signal::Error(e.to_string())).ok();
+                    return;
+                }
+                sender
+                    .output(Signal::Progress(format!(
+                        "Syncing {}...",
+                        repo.local_name
+                    )))
+                    .ok();
+                match shaders::sync_repo(&repo, &repos_dir) {
+                    Ok(()) => sender.output(Signal::Complete).ok(),
+                    Err(e) => sender
+                        .output(Signal::RepoError {
+                            repo_name: repo.local_name.clone(),
+                            error: e.to_string(),
+                        })
+                        .ok(),
+                };
             }
         }
     }

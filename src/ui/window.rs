@@ -15,6 +15,8 @@ use crate::ui::game_detail;
 use crate::ui::game_list;
 use crate::ui::install_worker;
 use crate::ui::preferences;
+use crate::ui::shader_catalog;
+use crate::ui::shader_worker;
 
 /// Root window model.
 pub struct Window {
@@ -26,10 +28,14 @@ pub struct Window {
     game_list: Controller<game_list::GameList>,
     /// Detail pane child component.
     game_detail: Controller<game_detail::GameDetail>,
+    /// Shader catalog tab component.
+    shader_catalog: relm4::Controller<shader_catalog::ShaderCatalog>,
     /// Preferences page child component.
     preferences: Controller<preferences::Preferences>,
     /// Background install/uninstall worker.
     install_worker: WorkerController<install_worker::InstallWorker>,
+    /// Background shader sync worker (used for single-repo downloads).
+    shader_worker: WorkerController<shader_worker::ShaderWorker>,
     /// Navigation view — used to push game detail page.
     nav_view: adw::NavigationView,
 }
@@ -63,6 +69,14 @@ pub enum Controls {
     AddGameRequested,
     /// Preferences emitted a config change; carry updated config.
     ConfigChanged(GlobalConfig),
+    /// User requested downloading a shader repo from the catalog.
+    ShaderDownloadRequested(crate::reshade::config::ShaderRepo),
+    /// Shader worker reported download progress.
+    ShaderProgress(String),
+    /// Shader worker finished syncing a catalog repo.
+    ShaderSyncComplete,
+    /// Shader worker reported an error syncing a catalog repo.
+    ShaderSyncError(String),
 }
 
 #[allow(missing_docs)]
@@ -144,9 +158,35 @@ impl Component for Window {
                 install_worker::Signal::Error(e) => Controls::WorkerError(e),
             });
 
+        let shader_catalog = shader_catalog::ShaderCatalog::builder()
+            .launch(shader_catalog::ShaderCatalogInit {
+                data_dir: app_state.data_dir.clone(),
+            })
+            .forward(sender.input_sender(), |sig| match sig {
+                shader_catalog::Signal::DownloadRequested(repo) => {
+                    Controls::ShaderDownloadRequested(repo)
+                }
+            });
+
+        let shader_worker = shader_worker::ShaderWorker::builder()
+            .detach_worker(())
+            .forward(sender.input_sender(), |sig| match sig {
+                shader_worker::Signal::Progress(msg) => Controls::ShaderProgress(msg),
+                shader_worker::Signal::Complete => Controls::ShaderSyncComplete,
+                shader_worker::Signal::RepoError { error, .. } => {
+                    Controls::ShaderSyncError(error)
+                }
+                shader_worker::Signal::Error(e) => Controls::ShaderSyncError(e),
+            });
+
         // Build ViewStack.
         let view_stack = adw::ViewStack::new();
         view_stack.add_titled(game_list.widget(), Some("my-games"), &fl!("my-games"));
+        view_stack.add_titled(
+            shader_catalog.widget(),
+            Some("shaders"),
+            &fl!("shaders-section"),
+        );
         view_stack.add_titled(
             preferences.widget(),
             Some("preferences"),
@@ -186,8 +226,10 @@ impl Component for Window {
             games,
             game_list,
             game_detail,
+            shader_catalog,
             preferences,
             install_worker,
+            shader_worker,
             nav_view: nav_view.clone(),
         };
 
@@ -267,6 +309,24 @@ impl Component for Window {
                 if let Err(e) = self.app_state.save() {
                     log::error!("Failed to save config: {e}");
                 }
+            }
+
+            Controls::ShaderDownloadRequested(repo) => {
+                let data_dir = self.app_state.data_dir.clone();
+                self.shader_worker
+                    .emit(shader_worker::Controls::SyncOne { repo, data_dir });
+            }
+            Controls::ShaderProgress(msg) => {
+                self.shader_catalog
+                    .emit(shader_catalog::Controls::SyncProgress(msg));
+            }
+            Controls::ShaderSyncComplete => {
+                self.shader_catalog
+                    .emit(shader_catalog::Controls::SyncComplete);
+            }
+            Controls::ShaderSyncError(e) => {
+                self.shader_catalog
+                    .emit(shader_catalog::Controls::SyncError(e));
             }
         }
     }
