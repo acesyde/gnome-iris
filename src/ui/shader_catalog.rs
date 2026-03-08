@@ -137,25 +137,21 @@ impl SimpleComponent for ShaderCatalog {
             row.set_title(entry.name);
             row.set_subtitle(entry.description);
 
-            if model.installed.contains(entry.local_name) {
-                let btn = gtk::Button::from_icon_name("emblem-default-symbolic");
-                btn.set_valign(gtk::Align::Center);
-                btn.add_css_class("flat");
-                btn.set_sensitive(false);
-                btn.set_tooltip_text(Some("Downloaded"));
-                row.add_suffix(&btn);
+            let (icon, tip) = if model.installed.contains(entry.local_name) {
+                ("view-refresh-symbolic", "Re-download")
             } else {
-                let btn = gtk::Button::from_icon_name("folder-download-symbolic");
-                btn.set_valign(gtk::Align::Center);
-                btn.add_css_class("flat");
-                btn.set_tooltip_text(Some("Download"));
-                {
-                    let s = sender.clone();
-                    btn.connect_clicked(move |_| s.input(Controls::DownloadRepo(entry)));
-                }
-                row.add_suffix(&btn);
-                model.row_buttons.insert(entry.local_name.to_owned(), btn);
+                ("folder-download-symbolic", "Download")
+            };
+            let btn = gtk::Button::from_icon_name(icon);
+            btn.set_valign(gtk::Align::Center);
+            btn.add_css_class("flat");
+            btn.set_tooltip_text(Some(tip));
+            {
+                let s = sender.clone();
+                btn.connect_clicked(move |_| s.input(Controls::DownloadRepo(entry)));
             }
+            row.add_suffix(&btn);
+            model.row_buttons.insert(entry.local_name.to_owned(), btn);
 
             widgets.catalog_group.add(&row);
         }
@@ -173,7 +169,8 @@ impl SimpleComponent for ShaderCatalog {
 
         // Pre-populate custom repos.
         for repo in &init.custom_repos {
-            let row = build_custom_row(repo, &mut model.row_buttons, &sender);
+            let is_installed = model.installed.contains(&repo.local_name);
+            let row = build_custom_row(repo, is_installed, &mut model.row_buttons, &sender);
             widgets.custom_group.add(&row);
             model.custom_rows.insert(repo.local_name.clone(), row);
         }
@@ -199,7 +196,8 @@ impl SimpleComponent for ShaderCatalog {
                 sender.output(Signal::AddCustomRepoRequested).ok();
             }
             Controls::AddCustomRepo(repo) => {
-                let row = build_custom_row(&repo, &mut self.row_buttons, &sender);
+                let is_installed = self.installed.contains(&repo.local_name);
+                let row = build_custom_row(&repo, is_installed, &mut self.row_buttons, &sender);
                 self.custom_group.add(&row);
                 self.custom_rows.insert(repo.local_name.clone(), row);
             }
@@ -230,8 +228,9 @@ impl SimpleComponent for ShaderCatalog {
                 if let Some(local_name) = self.syncing.take() {
                     self.installed.insert(local_name.clone());
                     if let Some(btn) = self.row_buttons.get(&local_name) {
-                        btn.set_icon_name("emblem-default-symbolic");
-                        btn.set_tooltip_text(Some("Downloaded"));
+                        btn.set_icon_name("view-refresh-symbolic");
+                        btn.set_tooltip_text(Some("Re-download"));
+                        btn.set_sensitive(true);
                     }
                 }
             }
@@ -250,6 +249,7 @@ impl SimpleComponent for ShaderCatalog {
 /// Build an [`adw::ActionRow`] for a custom repo with download and remove buttons.
 fn build_custom_row(
     repo: &ShaderRepo,
+    is_installed: bool,
     row_buttons: &mut HashMap<String, gtk::Button>,
     sender: &ComponentSender<ShaderCatalog>,
 ) -> adw::ActionRow {
@@ -257,11 +257,16 @@ fn build_custom_row(
     row.set_title(&repo.local_name);
     row.set_subtitle(&repo.url);
 
-    // Download button.
-    let dl_btn = gtk::Button::from_icon_name("folder-download-symbolic");
+    // Download button — shows refresh icon when already installed.
+    let (icon, tip) = if is_installed {
+        ("view-refresh-symbolic", "Re-download")
+    } else {
+        ("folder-download-symbolic", "Download")
+    };
+    let dl_btn = gtk::Button::from_icon_name(icon);
     dl_btn.set_valign(gtk::Align::Center);
     dl_btn.add_css_class("flat");
-    dl_btn.set_tooltip_text(Some("Download"));
+    dl_btn.set_tooltip_text(Some(tip));
     {
         let s = sender.clone();
         let repo_clone = repo.clone();
