@@ -67,7 +67,7 @@ impl SimpleComponent for GameDetail {
     view! {
         adw::NavigationPage {
             #[watch]
-            set_title: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or(""),
+            set_title: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or("Game"),
 
             #[wrap(Some)]
             set_child = &adw::ToolbarView {
