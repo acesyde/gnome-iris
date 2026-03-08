@@ -80,12 +80,7 @@ impl Component for Window {
                     set_width_request: 260,
 
                     adw::ToolbarView {
-                        add_top_bar = &adw::HeaderBar {
-                            pack_start = &gtk::Button {
-                                set_icon_name: "folder-open-symbolic",
-                                set_tooltip_text: Some(&fl!("add-game")),
-                            },
-                        },
+                        add_top_bar = &adw::HeaderBar {},
 
                         model.game_list.widget() -> &gtk::Box {},
                     },
