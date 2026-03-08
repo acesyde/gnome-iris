@@ -35,25 +35,65 @@ pub fn parse_library_folders_vdf(vdf_str: &str) -> Result<Vec<PathBuf>> {
 }
 
 /// Scans all Steam libraries and returns discovered games.
+///
+/// Only entries whose `appmanifest_*.acf` declares `type = "Game"` are included,
+/// which filters out Proton runtimes, SteamLinuxRuntime, and other tools.
 pub fn discover_steam_games() -> Vec<Game> {
     let Ok(libraries) = find_steam_libraries() else {
         return vec![];
     };
     let mut games = Vec::new();
     for library in libraries {
-        let common = library.join("steamapps/common");
-        let Ok(entries) = std::fs::read_dir(&common) else {
+        let steamapps = library.join("steamapps");
+        let Ok(entries) = std::fs::read_dir(&steamapps) else {
             continue;
         };
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_dir() {
-                let name = entry.file_name().to_string_lossy().into_owned();
-                games.push(Game::new(name, path, GameSource::Steam { app_id: 0 }));
+            let name = entry.file_name();
+            let fname = name.to_string_lossy();
+            if !fname.starts_with("appmanifest_") || !fname.ends_with(".acf") {
+                continue;
+            }
+            if let Some(game) = parse_appmanifest(&path, &steamapps) {
+                games.push(game);
             }
         }
     }
     games
+}
+
+/// Parses a single `appmanifest_<id>.acf` file.
+///
+/// Returns `Some(Game)` only when the manifest declares `type = "Game"`.
+fn parse_appmanifest(acf_path: &Path, steamapps: &Path) -> Option<Game> {
+    let content = std::fs::read_to_string(acf_path).ok()?;
+    let vdf = keyvalues_parser::parse(&content).ok()?;
+    let obj = vdf.value.get_obj()?;
+
+    let get = |key: &str| -> Option<String> {
+        obj.get(key)
+            .and_then(|vs| vs.first())
+            .and_then(|v| v.get_str())
+            .map(|s| s.to_owned())
+    };
+
+    // Only include actual games, not tools/runtimes.
+    let app_type = get("type").unwrap_or_default();
+    if !app_type.eq_ignore_ascii_case("game") {
+        return None;
+    }
+
+    let name = get("name")?;
+    let install_dir = get("installdir")?;
+    let app_id: u32 = get("appid").and_then(|s| s.parse().ok()).unwrap_or(0);
+    let path = steamapps.join("common").join(install_dir);
+
+    if !path.exists() {
+        return None;
+    }
+
+    Some(Game::new(name, path, GameSource::Steam { app_id }))
 }
 
 /// Detects the architecture of a PE `.exe` by reading its header bytes.
