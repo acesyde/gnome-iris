@@ -43,6 +43,7 @@ impl SimpleComponent for GameList {
                 set_selection_mode: gtk::SelectionMode::None,
                 add_css_class: "boxed-list",
                 set_margin_all: 12,
+                set_valign: gtk::Align::Start,
             },
         }
     }
