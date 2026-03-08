@@ -11,6 +11,7 @@ use crate::reshade::app_state::{AppState, iris_data_dir};
 use crate::reshade::config::GlobalConfig;
 use crate::reshade::game::Game;
 use crate::reshade::reshade::list_installed_versions;
+use crate::ui::add_shader_repo_dialog;
 use crate::ui::game_detail;
 use crate::ui::game_list;
 use crate::ui::install_worker;
@@ -36,6 +37,8 @@ pub struct Window {
     install_worker: WorkerController<install_worker::InstallWorker>,
     /// Background shader sync worker (used for single-repo downloads).
     shader_worker: WorkerController<shader_worker::ShaderWorker>,
+    /// Dialog for adding a custom shader repository.
+    add_shader_repo_dialog: relm4::Controller<add_shader_repo_dialog::AddShaderRepoDialog>,
     /// Navigation view — used to push game detail page.
     nav_view: adw::NavigationView,
 }
@@ -77,6 +80,10 @@ pub enum Controls {
     ShaderSyncComplete,
     /// Shader worker reported an error syncing a catalog repo.
     ShaderSyncError(String),
+    /// Shader catalog "+" button clicked — present add-repo dialog.
+    ShaderAddCustomRepoRequested,
+    /// User confirmed new custom repo in dialog.
+    ShaderRepoAdded(crate::reshade::config::ShaderRepo),
 }
 
 #[allow(missing_docs)]
@@ -158,13 +165,35 @@ impl Component for Window {
                 install_worker::Signal::Error(e) => Controls::WorkerError(e),
             });
 
+        let known_names: std::collections::HashSet<&str> =
+            crate::reshade::catalog::KNOWN_REPOS.iter().map(|e| e.local_name).collect();
+        let custom_repos: Vec<_> = app_state
+            .config
+            .shader_repos
+            .iter()
+            .filter(|r| !known_names.contains(r.local_name.as_str()))
+            .cloned()
+            .collect();
+
         let shader_catalog = shader_catalog::ShaderCatalog::builder()
             .launch(shader_catalog::ShaderCatalogInit {
                 data_dir: app_state.data_dir.clone(),
+                custom_repos,
             })
             .forward(sender.input_sender(), |sig| match sig {
                 shader_catalog::Signal::DownloadRequested(repo) => {
                     Controls::ShaderDownloadRequested(repo)
+                }
+                shader_catalog::Signal::AddCustomRepoRequested => {
+                    Controls::ShaderAddCustomRepoRequested
+                }
+            });
+
+        let add_shader_repo_dialog = add_shader_repo_dialog::AddShaderRepoDialog::builder()
+            .launch(())
+            .forward(sender.input_sender(), |sig| match sig {
+                add_shader_repo_dialog::Signal::RepoAdded(repo) => {
+                    Controls::ShaderRepoAdded(repo)
                 }
             });
 
@@ -230,6 +259,7 @@ impl Component for Window {
             preferences,
             install_worker,
             shader_worker,
+            add_shader_repo_dialog,
             nav_view: nav_view.clone(),
         };
 
@@ -239,7 +269,7 @@ impl Component for Window {
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Controls, _sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update(&mut self, msg: Controls, _sender: ComponentSender<Self>, root: &Self::Root) {
         match msg {
             Controls::GameSelected(id) => {
                 if let Some(game) = self.games.iter().find(|g| g.id == id) {
@@ -327,6 +357,25 @@ impl Component for Window {
             Controls::ShaderSyncError(e) => {
                 self.shader_catalog
                     .emit(shader_catalog::Controls::SyncError(e));
+            }
+            Controls::ShaderAddCustomRepoRequested => {
+                self.add_shader_repo_dialog.widget().present(Some(root));
+            }
+            Controls::ShaderRepoAdded(repo) => {
+                let already = self
+                    .app_state
+                    .config
+                    .shader_repos
+                    .iter()
+                    .any(|r| r.local_name == repo.local_name);
+                if !already {
+                    self.app_state.config.shader_repos.push(repo.clone());
+                    if let Err(e) = self.app_state.save() {
+                        log::error!("Failed to save config after adding custom repo: {e}");
+                    }
+                }
+                self.shader_catalog
+                    .emit(shader_catalog::Controls::AddCustomRepo(repo));
             }
         }
     }

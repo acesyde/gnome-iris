@@ -19,6 +19,7 @@ no-preset = None
 # Shaders
 shaders-section = Shaders
 global-default = global default
+add-custom-repo = Add Custom Repository
 
 # Errors
 error-title = Error
