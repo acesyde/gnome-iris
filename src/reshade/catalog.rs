@@ -210,28 +210,28 @@ pub static KNOWN_REPOS: &[CatalogEntry] = &[
         name: "MadCake / reshade-shaders",
         description: "Shader collection by MadCake",
         local_name: "madcake-shaders",
-        url: "https://github.com/MadCake/reshade-shaders",
+        url: "https://github.com/KosRud/Shaders",
         branch: None,
     },
     CatalogEntry {
         name: "SirCobra / CobraFX",
         description: "Shader collection by SirCobra",
         local_name: "cobrafx",
-        url: "https://github.com/SirCobra/CobraFX",
+        url: "https://github.com/LordKobra/CobraFX",
         branch: None,
     },
     CatalogEntry {
         name: "Radegast001 / Warp-FX",
         description: "Warp and distortion effects",
         local_name: "warp-fx",
-        url: "https://github.com/Radegast001/Warp-FX",
+        url: "https://github.com/Radegast-FFXIV/Warp-FX",
         branch: None,
     },
     CatalogEntry {
         name: "fish-m-n / VRToolkit",
         description: "VR-optimized shader toolkit",
         local_name: "vrtoolkit",
-        url: "https://github.com/fish-m-n/VRToolkit",
+        url: "https://github.com/retroluxfilm/reshade-vrtoolkit",
         branch: None,
     },
     CatalogEntry {
@@ -245,7 +245,7 @@ pub static KNOWN_REPOS: &[CatalogEntry] = &[
         name: "rj200 / Glamayre Fast Effects",
         description: "Fast ambient occlusion, anti-aliasing and image enhancement",
         local_name: "glamayre",
-        url: "https://github.com/rj200/Glamayre-Fast-Effects",
+        url: "https://github.com/rj200/Glamarye_Fast_Effects_for_ReShade",
         branch: None,
     },
     CatalogEntry {
@@ -273,7 +273,7 @@ pub static KNOWN_REPOS: &[CatalogEntry] = &[
         name: "vortigen11 / vort_Shaders",
         description: "Various shader effects by vortigen",
         local_name: "vort-shaders",
-        url: "https://github.com/vortigen11/vort_Shaders",
+        url: "https://github.com/vortigern11/vort_Shaders",
         branch: None,
     },
     CatalogEntry {
@@ -301,7 +301,7 @@ pub static KNOWN_REPOS: &[CatalogEntry] = &[
         name: "Lilium23 / ReShade_HDR_shaders",
         description: "HDR shader effects",
         local_name: "reshade-hdr-shaders",
-        url: "https://github.com/Lilium23/ReShade_HDR_shaders",
+        url: "https://github.com/EndlesslyFlowering/ReShade_HDR_shaders",
         branch: None,
     },
     CatalogEntry {
@@ -390,7 +390,7 @@ pub static KNOWN_REPOS: &[CatalogEntry] = &[
     },
     CatalogEntry {
         name: "AS-StageFX",
-        description: "Dynamic stage lighting & atmospheric effects for ReShade. Features audio reactivity, spotlights, light walls and other effects.",
+        description: "Dynamic stage lighting &amp; atmospheric effects for ReShade. Features audio reactivity, spotlights, light walls and other effects.",
         local_name: "as-stagefx",
         url: "https://github.com/LeonAquitaine/as-stagefx",
         branch: None,

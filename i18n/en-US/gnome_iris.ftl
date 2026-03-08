@@ -21,6 +21,7 @@ shaders-section = Shaders
 global-default = global default
 add-custom-repo = Add Custom Repository
 open-shaders-folder = Open Shaders Folder
+download-all = Download All
 
 # Errors
 error-title = Error
