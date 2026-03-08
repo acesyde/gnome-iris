@@ -54,6 +54,8 @@ pub enum Controls {
     UninstallComplete,
     /// InstallWorker reported an error.
     WorkerError(String),
+    /// User clicked Add Game (dialog not yet implemented).
+    AddGameRequested,
 }
 
 #[allow(missing_docs)]
@@ -121,10 +123,7 @@ impl Component for Window {
             .launch(games.clone())
             .forward(sender.input_sender(), |sig| match sig {
                 game_list::Signal::GameSelected(id) => Controls::GameSelected(id),
-                game_list::Signal::AddGameRequested => {
-                    // TODO: open add-game dialog
-                    Controls::ToggleSidebar // no-op placeholder
-                }
+                game_list::Signal::AddGameRequested => Controls::AddGameRequested,
             });
 
         // Launch game detail pane.
@@ -225,6 +224,10 @@ impl Component for Window {
                 log::error!("Install worker error: {e}");
                 self.game_detail
                     .emit(game_detail::Controls::SetProgress(format!("Error: {e}")));
+            }
+
+            Controls::AddGameRequested => {
+                // TODO: open AddGameDialog
             }
         }
     }
