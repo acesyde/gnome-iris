@@ -156,6 +156,23 @@ impl SimpleComponent for ShaderCatalog {
             widgets.catalog_group.add(&row);
         }
 
+        // Attach the "Open Folder" button to the catalog group header.
+        let open_btn = gtk::Button::from_icon_name("folder-open-symbolic");
+        open_btn.set_valign(gtk::Align::Center);
+        open_btn.add_css_class("flat");
+        open_btn.set_tooltip_text(Some(&fl!("open-shaders-folder")));
+        {
+            let dir = repos_dir.clone();
+            open_btn.connect_clicked(move |_| {
+                let _ = std::fs::create_dir_all(&dir);
+                std::process::Command::new("xdg-open")
+                    .arg(dir.as_os_str())
+                    .spawn()
+                    .ok();
+            });
+        }
+        widgets.catalog_group.set_header_suffix(Some(&open_btn));
+
         // Attach the "+" button to the custom group header.
         let add_btn = gtk::Button::from_icon_name("list-add-symbolic");
         add_btn.set_valign(gtk::Align::Center);
