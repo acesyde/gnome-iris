@@ -217,16 +217,23 @@ impl Component for Window {
 
         // Build ViewStack.
         let view_stack = adw::ViewStack::new();
-        view_stack.add_titled(game_list.widget(), Some("my-games"), &fl!("my-games"));
-        view_stack.add_titled(
+        view_stack.add_titled_with_icon(
+            game_list.widget(),
+            Some("my-games"),
+            &fl!("my-games"),
+            "input-gaming-symbolic",
+        );
+        view_stack.add_titled_with_icon(
             shader_catalog.widget(),
             Some("shaders"),
             &fl!("shaders-section"),
+            "preferences-color-symbolic",
         );
-        view_stack.add_titled(
+        view_stack.add_titled_with_icon(
             preferences.widget(),
             Some("preferences"),
             &fl!("preferences"),
+            "preferences-system-symbolic",
         );
 
         // Build ViewSwitcher wired to stack.
