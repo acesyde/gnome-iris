@@ -1,11 +1,12 @@
-//! Sidebar component listing all known games.
+//! Scrollable list of game cards.
 
-use relm4::gtk::prelude::*;
-use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, gtk};
+use relm4::adw::prelude::*;
+use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk};
 
+use crate::fl;
 use crate::reshade::game::Game;
 
-/// Sidebar game list model.
+/// Game list model.
 pub struct GameList {
     /// All games to display.
     games: Vec<Game>,
@@ -23,8 +24,6 @@ pub enum Controls {
 pub enum Signal {
     /// User selected a game by its stable ID.
     GameSelected(String),
-    /// User clicked the Add Game button.
-    AddGameRequested,
 }
 
 #[allow(missing_docs)]
@@ -35,28 +34,15 @@ impl SimpleComponent for GameList {
     type Output = Signal;
 
     view! {
-        gtk::Box {
-            set_orientation: gtk::Orientation::Vertical,
+        gtk::ScrolledWindow {
+            set_vexpand: true,
+            set_hscrollbar_policy: gtk::PolicyType::Never,
 
-            gtk::ScrolledWindow {
-                set_vexpand: true,
-                set_hscrollbar_policy: gtk::PolicyType::Never,
-
-                #[name(list_box)]
-                gtk::ListBox {
-                    set_selection_mode: gtk::SelectionMode::Single,
-                    add_css_class: "navigation-sidebar",
-                },
-            },
-
-            gtk::Separator {},
-
-            gtk::Button {
-                set_label: "+ Add Game",
-                set_margin_all: 8,
-                connect_clicked[sender] => move |_| {
-                    sender.output(Signal::AddGameRequested).ok();
-                },
+            #[name(list_box)]
+            gtk::ListBox {
+                set_selection_mode: gtk::SelectionMode::None,
+                add_css_class: "boxed-list",
+                set_margin_all: 12,
             },
         }
     }
@@ -73,17 +59,15 @@ impl SimpleComponent for GameList {
 
         // Populate initial rows
         for game in &games {
-            let row = make_game_row(game);
+            let row = make_game_card(game);
             widgets.list_box.append(&row);
         }
 
         // Emit selection signal when a row is activated
         let sender2 = sender.clone();
-        widgets.list_box.connect_row_selected(move |_, row| {
-            if let Some(row) = row {
-                let id = row.widget_name().to_string();
-                sender2.output(Signal::GameSelected(id)).ok();
-            }
+        widgets.list_box.connect_row_activated(move |_, row| {
+            let id = row.widget_name().to_string();
+            sender2.output(Signal::GameSelected(id)).ok();
         });
 
         ComponentParts { model, widgets }
@@ -96,24 +80,24 @@ impl SimpleComponent for GameList {
     }
 }
 
-/// Builds a `ListBoxRow` for a single game.
-fn make_game_row(game: &Game) -> gtk::ListBoxRow {
-    let row = gtk::ListBoxRow::new();
+/// Builds an `adw::ActionRow` card for a single game.
+fn make_game_card(game: &Game) -> adw::ActionRow {
+    let row = adw::ActionRow::new();
     row.set_widget_name(&game.id);
+    row.set_title(&game.name);
+    let subtitle = if game.status.is_installed() {
+        String::from("ReShade installed")
+    } else {
+        fl!("not-installed")
+    };
+    row.set_subtitle(&subtitle);
+    row.set_activatable(true);
 
-    let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    hbox.set_margin_all(8);
+    let prefix = gtk::Image::from_icon_name("application-x-executable-symbolic");
+    row.add_prefix(&prefix);
 
-    let label = gtk::Label::new(Some(&game.name));
-    label.set_hexpand(true);
-    label.set_xalign(0.0);
-    hbox.append(&label);
+    let suffix = gtk::Image::from_icon_name("go-next-symbolic");
+    row.add_suffix(&suffix);
 
-    if game.status.is_installed() {
-        let check = gtk::Image::from_icon_name("emblem-ok-symbolic");
-        hbox.append(&check);
-    }
-
-    row.set_child(Some(&hbox));
     row
 }

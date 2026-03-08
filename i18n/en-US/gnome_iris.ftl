@@ -2,6 +2,7 @@
 app-title = Iris
 add-game = Add Game
 preferences = Preferences
+my-games = My Games
 about = About Iris
 
 # Game detail

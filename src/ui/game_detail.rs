@@ -65,99 +65,108 @@ impl SimpleComponent for GameDetail {
     type Output = Signal;
 
     view! {
-        gtk::Box {
-            set_orientation: gtk::Orientation::Vertical,
-            set_margin_all: 24,
-            set_spacing: 16,
+        adw::NavigationPage {
+            #[watch]
+            set_title: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or(""),
 
-            // Empty state
-            adw::StatusPage {
-                set_title: &fl!("select-a-game"),
-                set_icon_name: Some("view-list-symbolic"),
-                set_vexpand: true,
-                #[watch]
-                set_visible: model.game.is_none(),
-            },
+            #[wrap(Some)]
+            set_child = &adw::ToolbarView {
+                add_top_bar = &adw::HeaderBar {},
 
-            // Game content
-            gtk::Box {
-                set_orientation: gtk::Orientation::Vertical,
-                set_spacing: 12,
-                set_vexpand: true,
-                #[watch]
-                set_visible: model.game.is_some(),
+                #[wrap(Some)]
+                set_content = &gtk::Box {
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_margin_all: 24,
+                    set_spacing: 16,
 
-                #[name(game_name_label)]
-                gtk::Label {
-                    add_css_class: "title-1",
-                    #[watch]
-                    set_label: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or(""),
-                    set_xalign: 0.0,
-                },
-
-                #[name(game_path_label)]
-                gtk::Label {
-                    add_css_class: "caption",
-                    set_xalign: 0.0,
-                    set_ellipsize: gtk::pango::EllipsizeMode::Middle,
-                    #[watch]
-                    set_label: model
-                        .game
-                        .as_ref()
-                        .map(|g| g.path.to_string_lossy().into_owned())
-                        .unwrap_or_default()
-                        .as_str(),
-                },
-
-                // Progress banner
-                adw::Banner {
-                    #[watch]
-                    set_title: model.progress_message.as_deref().unwrap_or(""),
-                    #[watch]
-                    set_revealed: model.progress_message.is_some(),
-                },
-
-                // Action buttons
-                gtk::Box {
-                    set_orientation: gtk::Orientation::Horizontal,
-                    set_spacing: 8,
-
-                    gtk::Button {
-                        set_label: &fl!("install"),
-                        add_css_class: "suggested-action",
+                    // Empty state
+                    adw::StatusPage {
+                        set_title: &fl!("select-a-game"),
+                        set_icon_name: Some("view-list-symbolic"),
+                        set_vexpand: true,
                         #[watch]
-                        set_visible: model
-                            .game
-                            .as_ref()
-                            .map(|g| !g.status.is_installed())
-                            .unwrap_or(true),
-                        connect_clicked[sender] => move |_| {
-                            sender
-                                .output(Signal::Install {
-                                    game_id: String::new(),
-                                    dll: DllOverride::Dxgi,
-                                    arch: ExeArch::X86_64,
-                                })
-                                .ok();
-                        },
+                        set_visible: model.game.is_none(),
                     },
 
-                    gtk::Button {
-                        set_label: &fl!("uninstall"),
-                        add_css_class: "destructive-action",
+                    // Game content
+                    gtk::Box {
+                        set_orientation: gtk::Orientation::Vertical,
+                        set_spacing: 12,
+                        set_vexpand: true,
                         #[watch]
-                        set_visible: model
-                            .game
-                            .as_ref()
-                            .map(|g| g.status.is_installed())
-                            .unwrap_or(false),
-                        connect_clicked[sender] => move |_| {
-                            sender
-                                .output(Signal::Uninstall {
-                                    game_id: String::new(),
-                                    dll: DllOverride::Dxgi,
-                                })
-                                .ok();
+                        set_visible: model.game.is_some(),
+
+                        gtk::Label {
+                            add_css_class: "title-1",
+                            #[watch]
+                            set_label: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or(""),
+                            set_xalign: 0.0,
+                        },
+
+                        gtk::Label {
+                            add_css_class: "caption",
+                            set_xalign: 0.0,
+                            set_ellipsize: gtk::pango::EllipsizeMode::Middle,
+                            #[watch]
+                            set_label: model
+                                .game
+                                .as_ref()
+                                .map(|g| g.path.to_string_lossy().into_owned())
+                                .unwrap_or_default()
+                                .as_str(),
+                        },
+
+                        // Progress banner
+                        adw::Banner {
+                            #[watch]
+                            set_title: model.progress_message.as_deref().unwrap_or(""),
+                            #[watch]
+                            set_revealed: model.progress_message.is_some(),
+                        },
+
+                        // Action buttons
+                        gtk::Box {
+                            set_orientation: gtk::Orientation::Horizontal,
+                            set_spacing: 8,
+
+                            gtk::Button {
+                                set_label: &fl!("install"),
+                                add_css_class: "suggested-action",
+                                #[watch]
+                                set_visible: model
+                                    .game
+                                    .as_ref()
+                                    .map(|g| !g.status.is_installed())
+                                    .unwrap_or(true),
+                                connect_clicked[sender] => move |_| {
+                                    sender
+                                        .output(Signal::Install {
+                                            game_id: String::new(),
+                                            dll: DllOverride::Dxgi,
+                                            arch: ExeArch::X86_64,
+                                        })
+                                        .ok();
+                                },
+                            },
+
+                            gtk::Button {
+                                set_label: &fl!("uninstall"),
+                                add_css_class: "destructive-action",
+                                #[watch]
+                                set_visible: model
+                                    .game
+                                    .as_ref()
+                                    .map(|g| g.status.is_installed())
+                                    .unwrap_or(false),
+                                connect_clicked[sender] => move |_| {
+                                    sender
+                                        .output(Signal::Uninstall {
+                                            game_id: String::new(),
+                                            dll: DllOverride::Dxgi,
+                                        })
+                                        .ok();
+                                },
+                            },
                         },
                     },
                 },
