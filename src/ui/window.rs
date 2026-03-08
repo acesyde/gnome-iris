@@ -250,14 +250,12 @@ impl Component for Window {
             .license_type(gtk::License::Gpl20)
             .comments("ReShade manager for Wine/Proton games on Linux")
             .build();
-        about_dialog.add_acknowledgement_section(
-            Some("Inspiration & references"),
-            &[
-                "reshade-steam-proton <https://github.com/kevinlekiller/reshade-steam-proton>",
-                "ReShade <https://reshade.me/>",
-                "ratic <https://gitlab.gnome.org/ratcornu/ratic>",
-            ],
+        about_dialog.add_link(
+            "reshade-steam-proton",
+            "https://github.com/kevinlekiller/reshade-steam-proton",
         );
+        about_dialog.add_link("ReShade", "https://reshade.me/");
+        about_dialog.add_link("ratic (codebase)", "https://gitlab.gnome.org/ratcornu/ratic");
         {
             let dialog = about_dialog.clone();
             let win = root.clone();
