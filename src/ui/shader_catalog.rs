@@ -28,8 +28,10 @@ pub struct ShaderCatalog {
     syncing: Option<String>,
     /// Download buttons keyed by `local_name` (only for not-yet-installed repos).
     row_buttons: HashMap<String, gtk::Button>,
-    /// The "Custom Repositories" group — stored for dynamic row insertion.
+    /// The "Custom Repositories" group — stored for dynamic row insertion/removal.
     custom_group: adw::PreferencesGroup,
+    /// Custom repo rows keyed by `local_name` — needed to remove them from the group.
+    custom_rows: HashMap<String, adw::ActionRow>,
 }
 
 /// Input messages for [`ShaderCatalog`].
@@ -41,6 +43,10 @@ pub enum Controls {
     AddCustomRepo(ShaderRepo),
     /// User clicked download on a custom repo row.
     DownloadCustomRepo(ShaderRepo),
+    /// User clicked the trash button on a custom repo row.
+    RemoveCustomRepoRequested(ShaderRepo),
+    /// Window confirmed removal — remove the row and clean up internal state.
+    RemoveCustomRepo(ShaderRepo),
     /// Progress message forwarded from the shader worker.
     SyncProgress(String),
     /// The worker finished syncing the in-flight repo successfully.
@@ -58,6 +64,8 @@ pub enum Signal {
     DownloadRequested(ShaderRepo),
     /// User clicked the "+" button — window should open the add-repo dialog.
     AddCustomRepoRequested,
+    /// User clicked the trash button — window should remove from config and disk.
+    RemoveCustomRepoRequested(ShaderRepo),
 }
 
 #[allow(missing_docs)]
@@ -116,6 +124,7 @@ impl SimpleComponent for ShaderCatalog {
             syncing: None,
             row_buttons: HashMap::new(),
             custom_group: adw::PreferencesGroup::new(),
+            custom_rows: HashMap::new(),
         };
 
         let widgets = view_output!();
@@ -164,31 +173,9 @@ impl SimpleComponent for ShaderCatalog {
 
         // Pre-populate custom repos.
         for repo in &init.custom_repos {
-            let row = adw::ActionRow::new();
-            row.set_title(&repo.local_name);
-            row.set_subtitle(&repo.url);
-            let is_installed = model.installed.contains(&repo.local_name);
-            let btn = gtk::Button::from_icon_name(if is_installed {
-                "emblem-default-symbolic"
-            } else {
-                "folder-download-symbolic"
-            });
-            btn.set_valign(gtk::Align::Center);
-            btn.add_css_class("flat");
-            btn.set_sensitive(!is_installed);
-            if !is_installed {
-                btn.set_tooltip_text(Some("Download"));
-                let s = sender.clone();
-                let repo_clone = repo.clone();
-                btn.connect_clicked(move |_| {
-                    s.input(Controls::DownloadCustomRepo(repo_clone.clone()))
-                });
-                model.row_buttons.insert(repo.local_name.clone(), btn.clone());
-            } else {
-                btn.set_tooltip_text(Some("Downloaded"));
-            }
-            row.add_suffix(&btn);
+            let row = build_custom_row(repo, &mut model.row_buttons, &sender);
             widgets.custom_group.add(&row);
+            model.custom_rows.insert(repo.local_name.clone(), row);
         }
 
         ComponentParts { model, widgets }
@@ -212,31 +199,19 @@ impl SimpleComponent for ShaderCatalog {
                 sender.output(Signal::AddCustomRepoRequested).ok();
             }
             Controls::AddCustomRepo(repo) => {
-                let row = adw::ActionRow::new();
-                row.set_title(&repo.local_name);
-                row.set_subtitle(&repo.url);
-                let is_installed = self.installed.contains(&repo.local_name);
-                let btn = gtk::Button::from_icon_name(if is_installed {
-                    "emblem-default-symbolic"
-                } else {
-                    "folder-download-symbolic"
-                });
-                btn.set_valign(gtk::Align::Center);
-                btn.add_css_class("flat");
-                btn.set_sensitive(!is_installed);
-                if !is_installed {
-                    btn.set_tooltip_text(Some("Download"));
-                    let s = sender.clone();
-                    let repo_clone = repo.clone();
-                    btn.connect_clicked(move |_| {
-                        s.input(Controls::DownloadCustomRepo(repo_clone.clone()))
-                    });
-                    self.row_buttons.insert(repo.local_name.clone(), btn.clone());
-                } else {
-                    btn.set_tooltip_text(Some("Downloaded"));
-                }
-                row.add_suffix(&btn);
+                let row = build_custom_row(&repo, &mut self.row_buttons, &sender);
                 self.custom_group.add(&row);
+                self.custom_rows.insert(repo.local_name.clone(), row);
+            }
+            Controls::RemoveCustomRepoRequested(repo) => {
+                sender.output(Signal::RemoveCustomRepoRequested(repo)).ok();
+            }
+            Controls::RemoveCustomRepo(repo) => {
+                self.installed.remove(&repo.local_name);
+                self.row_buttons.remove(&repo.local_name);
+                if let Some(row) = self.custom_rows.remove(&repo.local_name) {
+                    self.custom_group.remove(&row);
+                }
             }
             Controls::DownloadCustomRepo(repo) => {
                 if self.syncing.is_some() {
@@ -270,4 +245,47 @@ impl SimpleComponent for ShaderCatalog {
             }
         }
     }
+}
+
+/// Build an [`adw::ActionRow`] for a custom repo with download and remove buttons.
+fn build_custom_row(
+    repo: &ShaderRepo,
+    row_buttons: &mut HashMap<String, gtk::Button>,
+    sender: &ComponentSender<ShaderCatalog>,
+) -> adw::ActionRow {
+    let row = adw::ActionRow::new();
+    row.set_title(&repo.local_name);
+    row.set_subtitle(&repo.url);
+
+    // Download button.
+    let dl_btn = gtk::Button::from_icon_name("folder-download-symbolic");
+    dl_btn.set_valign(gtk::Align::Center);
+    dl_btn.add_css_class("flat");
+    dl_btn.set_tooltip_text(Some("Download"));
+    {
+        let s = sender.clone();
+        let repo_clone = repo.clone();
+        dl_btn.connect_clicked(move |_| {
+            s.input(Controls::DownloadCustomRepo(repo_clone.clone()))
+        });
+    }
+    row.add_suffix(&dl_btn);
+    row_buttons.insert(repo.local_name.clone(), dl_btn);
+
+    // Remove button.
+    let rm_btn = gtk::Button::from_icon_name("user-trash-symbolic");
+    rm_btn.set_valign(gtk::Align::Center);
+    rm_btn.add_css_class("flat");
+    rm_btn.add_css_class("destructive-action");
+    rm_btn.set_tooltip_text(Some("Remove"));
+    {
+        let s = sender.clone();
+        let repo_clone = repo.clone();
+        rm_btn.connect_clicked(move |_| {
+            s.input(Controls::RemoveCustomRepoRequested(repo_clone.clone()))
+        });
+    }
+    row.add_suffix(&rm_btn);
+
+    row
 }

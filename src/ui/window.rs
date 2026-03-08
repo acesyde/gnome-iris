@@ -86,6 +86,8 @@ pub enum Controls {
     ShaderAddCustomRepoRequested,
     /// User confirmed new custom repo in dialog.
     ShaderRepoAdded(crate::reshade::config::ShaderRepo),
+    /// User clicked the trash button on a custom repo row.
+    ShaderRemoveCustomRepoRequested(crate::reshade::config::ShaderRepo),
 }
 
 #[allow(missing_docs)]
@@ -188,6 +190,9 @@ impl Component for Window {
                 }
                 shader_catalog::Signal::AddCustomRepoRequested => {
                     Controls::ShaderAddCustomRepoRequested
+                }
+                shader_catalog::Signal::RemoveCustomRepoRequested(repo) => {
+                    Controls::ShaderRemoveCustomRepoRequested(repo)
                 }
             });
 
@@ -369,6 +374,30 @@ impl Component for Window {
             }
             Controls::ShaderAddCustomRepoRequested => {
                 self.add_shader_repo_dialog.widget().present(Some(root));
+            }
+            Controls::ShaderRemoveCustomRepoRequested(repo) => {
+                // Remove from persisted config.
+                self.app_state
+                    .config
+                    .shader_repos
+                    .retain(|r| r.local_name != repo.local_name);
+                if let Err(e) = self.app_state.save() {
+                    log::error!("Failed to save config after removing custom repo: {e}");
+                }
+                // Delete cloned data from disk.
+                let repo_dir = self
+                    .app_state
+                    .data_dir
+                    .join("ReShade_shaders")
+                    .join(&repo.local_name);
+                if repo_dir.exists() {
+                    if let Err(e) = std::fs::remove_dir_all(&repo_dir) {
+                        log::error!("Failed to delete repo directory {}: {e}", repo_dir.display());
+                    }
+                }
+                // Tell the catalog to remove the row.
+                self.shader_catalog
+                    .emit(shader_catalog::Controls::RemoveCustomRepo(repo));
             }
             Controls::ShaderRepoAdded(repo) => {
                 let in_catalog = crate::reshade::catalog::KNOWN_REPOS
