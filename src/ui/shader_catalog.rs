@@ -85,7 +85,7 @@ impl SimpleComponent for ShaderCatalog {
 
                 #[name(catalog_group)]
                 adw::PreferencesGroup {
-                    set_title: "Known Repositories",
+                    set_title: "Shaders",
                     set_description: Some(
                         "Download shader packs to the global cache. \
                          Use the game detail pane to enable them per game."
@@ -94,7 +94,7 @@ impl SimpleComponent for ShaderCatalog {
 
                 #[name(custom_group)]
                 adw::PreferencesGroup {
-                    set_title: "Custom Repositories",
+                    set_title: "Custom",
                 },
             },
         }
