@@ -8,7 +8,9 @@ use relm4::{
 
 use crate::fl;
 use crate::reshade::app_state::{AppState, iris_data_dir};
+use crate::reshade::config::GlobalConfig;
 use crate::reshade::game::Game;
+use crate::reshade::reshade::list_installed_versions;
 use crate::ui::game_detail;
 use crate::ui::game_list;
 use crate::ui::install_worker;
@@ -16,6 +18,8 @@ use crate::ui::preferences;
 
 /// Root window model.
 pub struct Window {
+    /// Persisted application state (config + games) — used for saving.
+    app_state: AppState,
     /// All known games (used to look up by ID on selection).
     games: Vec<Game>,
     /// Game-list child component.
@@ -57,6 +61,8 @@ pub enum Controls {
     WorkerError(String),
     /// User clicked the Add Game button.
     AddGameRequested,
+    /// Preferences emitted a config change; carry updated config.
+    ConfigChanged(GlobalConfig),
 }
 
 #[allow(missing_docs)]
@@ -85,7 +91,7 @@ impl Component for Window {
     ) -> ComponentParts<Self> {
         // Load state and discover Steam games.
         let app_state = AppState::load();
-        let mut games = app_state.games;
+        let mut games = app_state.games.clone();
         let steam_games = crate::reshade::steam::discover_steam_games();
         for sg in steam_games {
             if !games.iter().any(|g| g.id == sg.id) {
@@ -111,9 +117,21 @@ impl Component for Window {
                 }
             });
 
+        let installed_versions = list_installed_versions(&app_state.data_dir)
+            .unwrap_or_else(|e| {
+                log::warn!("Could not list ReShade versions: {e}");
+                Vec::new()
+            });
+        let preferences_init = preferences::PreferencesInit {
+            config: app_state.config.clone(),
+            installed_versions,
+            current_version: app_state.reshade_version.clone(),
+        };
         let preferences = preferences::Preferences::builder()
-            .launch(app_state.config)
-            .detach();
+            .launch(preferences_init)
+            .forward(sender.input_sender(), |sig| match sig {
+                preferences::Signal::ConfigChanged(config) => Controls::ConfigChanged(config),
+            });
 
         let install_worker = install_worker::InstallWorker::builder()
             .detach_worker(())
@@ -164,6 +182,7 @@ impl Component for Window {
         nav_view.push(&home_page);
 
         let model = Self {
+            app_state,
             games,
             game_list,
             game_detail,
@@ -241,6 +260,13 @@ impl Component for Window {
 
             Controls::AddGameRequested => {
                 // TODO: open AddGameDialog
+            }
+
+            Controls::ConfigChanged(config) => {
+                self.app_state.config = config;
+                if let Err(e) = self.app_state.save() {
+                    log::error!("Failed to save config: {e}");
+                }
             }
         }
     }
