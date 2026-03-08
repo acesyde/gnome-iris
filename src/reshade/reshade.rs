@@ -84,6 +84,40 @@ pub fn update_latest_symlink(base: &Path, version: &str) -> Result<()> {
     Ok(())
 }
 
+/// Returns all installed ReShade versions found under `base/reshade/`,
+/// sorted in ascending semver order. The `latest` symlink is excluded.
+pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
+    let reshade_dir = base.join("reshade");
+    if !reshade_dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut versions = Vec::new();
+    for entry in std::fs::read_dir(&reshade_dir)
+        .with_context(|| format!("Cannot read {}", reshade_dir.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_symlink() || !path.is_dir() {
+            continue;
+        }
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            versions.push(name.to_owned());
+        }
+    }
+    versions.sort_by(|a, b| {
+        let parse = |s: &str| -> (u64, u64, u64) {
+            let mut parts = s.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
+            (
+                parts.next().unwrap_or(0),
+                parts.next().unwrap_or(0),
+                parts.next().unwrap_or(0),
+            )
+        };
+        parse(a).cmp(&parse(b))
+    });
+    Ok(versions)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -120,6 +154,23 @@ mod tests {
     fn build_download_url_addon() {
         let url = download_url("6.1.0", true);
         assert_eq!(url, "https://reshade.me/downloads/ReShade_6.1.0_Addon.exe");
+    }
+
+    #[test]
+    fn list_versions_skips_symlink_and_sorts() {
+        let dir = tempfile::tempdir().unwrap();
+        let reshade = dir.path().join("reshade");
+        std::fs::create_dir_all(reshade.join("6.0.0")).unwrap();
+        std::fs::create_dir_all(reshade.join("6.1.0")).unwrap();
+        std::os::unix::fs::symlink("6.1.0", reshade.join("latest")).unwrap();
+        let versions = list_installed_versions(dir.path()).unwrap();
+        assert_eq!(versions, vec!["6.0.0", "6.1.0"]);
+    }
+
+    #[test]
+    fn list_versions_empty_when_dir_absent() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(list_installed_versions(dir.path()).unwrap().is_empty());
     }
 
     #[test]
