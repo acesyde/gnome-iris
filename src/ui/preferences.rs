@@ -20,6 +20,14 @@ pub struct Preferences {
     config: GlobalConfig,
     installed_versions: Vec<String>,
     current_version: Option<String>,
+    /// GTK row widgets for each installed version, keyed by version string.
+    version_rows: std::collections::HashMap<String, adw::ActionRow>,
+    /// Extra row shown when latest version is not locally installed.
+    latest_uninstalled_row: Option<adw::ActionRow>,
+    /// Reference to the versions group widget for dynamic row management.
+    versions_group: adw::PreferencesGroup,
+    /// Placeholder row shown when no versions are installed.
+    placeholder_row: Option<adw::ActionRow>,
 }
 
 /// Input messages for [`Preferences`].
@@ -33,6 +41,8 @@ pub enum Controls {
     GlobalIniChanged(bool),
     /// User changed the update-interval spin row.
     UpdateIntervalChanged(f64),
+    /// The latest available version was fetched from GitHub.
+    SetLatestVersion(String),
 }
 
 /// Output signals from [`Preferences`].
@@ -129,6 +139,10 @@ impl SimpleComponent for Preferences {
             config: init.config,
             installed_versions: init.installed_versions,
             current_version: init.current_version,
+            version_rows: std::collections::HashMap::new(),
+            latest_uninstalled_row: None,
+            versions_group: adw::PreferencesGroup::new(), // replaced below after view_output!
+            placeholder_row: None,
         };
         let widgets = view_output!();
 
@@ -146,12 +160,14 @@ impl SimpleComponent for Preferences {
         });
 
         // Populate installed versions rows imperatively (runtime data, can't use view! macro).
-        if model.installed_versions.is_empty() {
+        let (version_rows, placeholder_row) = if model.installed_versions.is_empty() {
             let row = adw::ActionRow::new();
             row.set_title("No versions installed");
             row.set_subtitle("Install ReShade from the game detail pane");
             widgets.versions_group.add(&row);
+            (std::collections::HashMap::new(), Some(row))
         } else {
+            let mut rows = std::collections::HashMap::new();
             for version in &model.installed_versions {
                 let row = adw::ActionRow::new();
                 row.set_title(version);
@@ -161,8 +177,19 @@ impl SimpleComponent for Preferences {
                     row.add_suffix(&icon);
                 }
                 widgets.versions_group.add(&row);
+                rows.insert(version.clone(), row);
             }
-        }
+            (rows, None)
+        };
+
+        // Rebuild model with actual widget references needed for dynamic updates.
+        let model = Self {
+            version_rows,
+            placeholder_row,
+            versions_group: widgets.versions_group.clone(),
+            latest_uninstalled_row: None,
+            ..model
+        };
 
         ComponentParts { model, widgets }
     }
@@ -190,6 +217,30 @@ impl SimpleComponent for Preferences {
                 if self.config.update_interval_hours != hours {
                     self.config.update_interval_hours = hours;
                     sender.output(Signal::ConfigChanged(self.config.clone())).ok();
+                }
+            }
+            Controls::SetLatestVersion(version) => {
+                if let Some(row) = self.version_rows.get(&version) {
+                    // Already installed — update subtitle to reflect it is the latest.
+                    let sub = if self.current_version.as_deref() == Some(version.as_str()) {
+                        "current · latest"
+                    } else {
+                        "latest"
+                    };
+                    row.set_subtitle(sub);
+                } else {
+                    // Not installed — remove placeholder if present, add/replace latest row.
+                    if let Some(ph) = self.placeholder_row.take() {
+                        self.versions_group.remove(&ph);
+                    }
+                    if let Some(old) = self.latest_uninstalled_row.take() {
+                        self.versions_group.remove(&old);
+                    }
+                    let row = adw::ActionRow::new();
+                    row.set_title(&version);
+                    row.set_subtitle("latest available — not installed");
+                    self.versions_group.add(&row);
+                    self.latest_uninstalled_row = Some(row);
                 }
             }
         }

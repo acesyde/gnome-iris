@@ -3,26 +3,37 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, anyhow};
-use regex::Regex;
+use serde::Deserialize;
 
-/// Fetches the latest ReShade version string from `reshade.me`.
-pub async fn fetch_latest_version() -> Result<String> {
-    let html = reqwest::get("https://reshade.me")
-        .await
-        .context("Failed to connect to reshade.me")?
-        .text()
-        .await?;
-    parse_version_from_html(&html).context("Could not parse ReShade version from reshade.me")
+#[derive(Deserialize)]
+struct GithubTag {
+    name: String,
 }
 
-/// Parses the ReShade version string from the HTML of `reshade.me`.
-pub fn parse_version_from_html(html: &str) -> Result<String> {
-    let re = Regex::new(r#"/downloads/ReShade_(\d+\.\d+\.\d+)(?:_Addon)?\.exe"#)
-        .expect("static regex");
-    re.captures(html)
-        .and_then(|c| c.get(1))
-        .map(|m| m.as_str().to_owned())
-        .ok_or_else(|| anyhow!("No ReShade version found in HTML"))
+/// Fetches the latest ReShade version string from the GitHub tags API.
+///
+/// Queries `https://api.github.com/repos/crosire/reshade/tags` and returns
+/// the tag name of the most recent release.
+///
+/// # Errors
+/// Returns an error if the network request fails, the response is not valid
+/// JSON, or GitHub returns an empty tag list.
+pub async fn fetch_latest_version() -> Result<String> {
+    let tags: Vec<GithubTag> = reqwest::Client::new()
+        .get("https://api.github.com/repos/crosire/reshade/tags")
+        .header(reqwest::header::USER_AGENT, "gnome-iris")
+        .send()
+        .await
+        .context("Failed to connect to GitHub tags API")?
+        .error_for_status()
+        .context("GitHub tags API returned an error status")?
+        .json()
+        .await
+        .context("Failed to parse GitHub tags API response")?;
+    tags.into_iter()
+        .next()
+        .map(|t| t.name)
+        .ok_or_else(|| anyhow!("GitHub tags API returned an empty list"))
 }
 
 /// Builds the download URL for a given version.
@@ -121,28 +132,6 @@ pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn parse_version_from_html_standard() {
-        let html = r#"<html><body>
-            <a href="/downloads/ReShade_6.1.0.exe">Download ReShade 6.1.0</a>
-            </body></html>"#;
-        let version = parse_version_from_html(html).unwrap();
-        assert_eq!(version, "6.1.0");
-    }
-
-    #[test]
-    fn parse_version_from_html_addon() {
-        let html = r#"<a href="/downloads/ReShade_6.1.0_Addon.exe">Download</a>"#;
-        let version = parse_version_from_html(html).unwrap();
-        assert_eq!(version, "6.1.0");
-    }
-
-    #[test]
-    fn parse_version_returns_err_when_not_found() {
-        let html = "<html>no reshade here</html>";
-        assert!(parse_version_from_html(html).is_err());
-    }
 
     #[test]
     fn build_download_url_standard() {

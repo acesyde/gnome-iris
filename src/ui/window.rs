@@ -88,6 +88,8 @@ pub enum Controls {
     ShaderRepoAdded(crate::reshade::config::ShaderRepo),
     /// User clicked the trash button on a custom repo row.
     ShaderRemoveCustomRepoRequested(crate::reshade::config::ShaderRepo),
+    /// Latest ReShade version was fetched from GitHub; forward to Preferences.
+    LatestVersionFetched(String),
 }
 
 #[allow(missing_docs)]
@@ -215,6 +217,10 @@ impl Component for Window {
                 shader_worker::Signal::Error(e) => Controls::ShaderSyncError(e),
             });
 
+        // Capture values needed for version-check task before app_state is moved.
+        let update_interval = app_state.config.update_interval_hours;
+        let cache_data_dir = app_state.data_dir.clone();
+
         // Build ViewStack.
         let view_stack = adw::ViewStack::new();
         view_stack.add_titled_with_icon(
@@ -317,6 +323,39 @@ impl Component for Window {
         let widgets = view_output!();
         // Wire nav_view as the toast overlay's child (must be done after view_output!).
         widgets.toast_overlay.set_child(Some(nav_view));
+
+        // Spawn startup version check respecting the configured interval.
+        {
+            let sender_clone = sender.clone();
+            relm4::spawn(async move {
+                use crate::reshade::cache::UpdateCache;
+                use crate::reshade::reshade::fetch_latest_version;
+
+                let cache = UpdateCache::new(cache_data_dir);
+                let version = if cache.needs_update(update_interval) {
+                    match fetch_latest_version().await {
+                        Ok(v) => {
+                            if let Err(e) = cache.write_version(&v) {
+                                log::warn!("Could not write version cache: {e}");
+                            }
+                            if let Err(e) = cache.touch() {
+                                log::warn!("Could not touch update cache: {e}");
+                            }
+                            Some(v)
+                        }
+                        Err(e) => {
+                            log::warn!("ReShade version check failed: {e}");
+                            cache.read_version().unwrap_or(None)
+                        }
+                    }
+                } else {
+                    cache.read_version().unwrap_or(None)
+                };
+                if let Some(v) = version {
+                    sender_clone.input(Controls::LatestVersionFetched(v));
+                }
+            });
+        }
 
         ComponentParts { model, widgets }
     }
@@ -437,6 +476,11 @@ impl Component for Window {
                 self.shader_catalog
                     .emit(shader_catalog::Controls::RemoveCustomRepo(repo));
             }
+            Controls::LatestVersionFetched(version) => {
+                self.preferences
+                    .emit(preferences::Controls::SetLatestVersion(version));
+            }
+
             Controls::ShaderRepoAdded(repo) => {
                 let in_catalog = crate::reshade::catalog::KNOWN_REPOS
                     .iter()

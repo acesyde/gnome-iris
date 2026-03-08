@@ -47,12 +47,11 @@ sha2       = "0.10"
 tokio      = { version = "1", features = ["macros", "rt", "sync"] }
 
 # Domain-specific
-reqwest          = { version = "0.12", features = ["stream"] }
+reqwest          = { version = "0.12", features = ["stream", "json"] }
 git2             = "0.19"
 keyvalues-parser = "0.2"
 sevenz-rust      = "0.6"
 zip              = "2"
-regex            = "1"
 
 [dev-dependencies]
 tempfile = "3"

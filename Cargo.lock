@@ -980,7 +980,6 @@ dependencies = [
  "i18n-embed-fl",
  "keyvalues-parser",
  "log",
- "regex",
  "relm4",
  "relm4-components",
  "relm4-icons",
