@@ -241,6 +241,30 @@ impl Component for Window {
         view_switcher.set_policy(adw::ViewSwitcherPolicy::Wide);
         view_switcher.set_stack(Some(&view_stack));
 
+        // Build About dialog and register a win.about action.
+        let about_dialog = adw::AboutDialog::builder()
+            .application_name("Iris")
+            .application_icon("iris")
+            .developer_name("gnome-iris contributors")
+            .version(env!("CARGO_PKG_VERSION"))
+            .license_type(gtk::License::Gpl20)
+            .comments("ReShade manager for Wine/Proton games on Linux")
+            .build();
+        {
+            let dialog = about_dialog.clone();
+            let win = root.clone();
+            let about_action = gtk::gio::SimpleAction::new("about", None);
+            about_action.connect_activate(move |_, _| dialog.present(Some(&win)));
+            root.add_action(&about_action);
+        }
+
+        // Build primary menu (⋮ button).
+        let primary_menu = gtk::gio::Menu::new();
+        primary_menu.append(Some(&fl!("about")), Some("win.about"));
+        let menu_btn = gtk::MenuButton::new();
+        menu_btn.set_icon_name("open-menu-symbolic");
+        menu_btn.set_menu_model(Some(&primary_menu));
+
         // Build HeaderBar.
         let add_button = gtk::Button::from_icon_name("list-add-symbolic");
         add_button.set_tooltip_text(Some(&fl!("add-game")));
@@ -250,6 +274,7 @@ impl Component for Window {
         });
         let header_bar = adw::HeaderBar::new();
         header_bar.pack_start(&add_button);
+        header_bar.pack_end(&menu_btn);
         header_bar.set_title_widget(Some(&view_switcher));
 
         // Build ToolbarView.
