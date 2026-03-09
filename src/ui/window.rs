@@ -186,8 +186,8 @@ impl Component for Window {
                     Controls::InstallComplete { version }
                 }
                 install_worker::Signal::UninstallComplete => Controls::UninstallComplete,
-                install_worker::Signal::DownloadVersionComplete { version } => {
-                    Controls::VersionDownloadComplete(version)
+                install_worker::Signal::DownloadVersionComplete { version_key } => {
+                    Controls::VersionDownloadComplete(version_key)
                 }
                 install_worker::Signal::DownloadVersionError(e) => {
                     Controls::VersionDownloadError(e)
@@ -505,11 +505,18 @@ impl Component for Window {
                     .emit(preferences::Controls::SetLatestVersion(version));
             }
 
-            Controls::VersionDownloadRequested(version) => {
+            Controls::VersionDownloadRequested(version_key) => {
+                let (version, addon) =
+                    if let Some(base) = version_key.strip_suffix("-Addon") {
+                        (base.to_owned(), true)
+                    } else {
+                        (version_key.clone(), false)
+                    };
                 self.install_worker
                     .emit(install_worker::Controls::DownloadVersion {
                         data_dir: self.app_state.data_dir.clone(),
                         version,
+                        addon,
                     });
             }
 

@@ -39,18 +39,24 @@ pub struct Preferences {
     version_spinners: HashMap<String, gtk::Spinner>,
     /// The latest known version string (set by `SetLatestVersion`).
     latest_version: Option<String>,
-    /// Extra row shown when latest version is not locally installed.
+    /// Extra row shown when latest standard version is not locally installed.
     latest_uninstalled_row: Option<adw::ActionRow>,
     /// Download button in the "latest not installed" row.
     install_button: Option<gtk::Button>,
-    /// Spinner for the install operation.
+    /// Spinner for the standard install operation.
     install_spinner: Option<gtk::Spinner>,
+    /// Extra row shown when latest Addon Support version is not locally installed.
+    latest_addon_uninstalled_row: Option<adw::ActionRow>,
+    /// Download button in the "latest addon not installed" row.
+    install_addon_button: Option<gtk::Button>,
+    /// Spinner for the addon install operation.
+    install_addon_spinner: Option<gtk::Spinner>,
     /// Reference to the versions group widget for dynamic row management.
     versions_group: adw::PreferencesGroup,
     /// Placeholder row shown when no versions are installed.
     placeholder_row: Option<adw::ActionRow>,
-    /// Tracks which version's action button is currently active (spinning).
-    active_version_op: Option<String>,
+    /// In-flight operation keys — allows standard and addon downloads to run concurrently.
+    active_ops: HashSet<String>,
 }
 
 /// Input messages for [`Preferences`].
@@ -185,9 +191,12 @@ impl SimpleComponent for Preferences {
             latest_uninstalled_row: None,
             install_button: None,
             install_spinner: None,
+            latest_addon_uninstalled_row: None,
+            install_addon_button: None,
+            install_addon_spinner: None,
             versions_group: adw::PreferencesGroup::new(), // replaced below after view_output!
             placeholder_row: None,
-            active_version_op: None,
+            active_ops: HashSet::new(),
         };
         let widgets = view_output!();
 
@@ -260,7 +269,10 @@ impl SimpleComponent for Preferences {
             latest_uninstalled_row: None,
             install_button: None,
             install_spinner: None,
-            active_version_op: None,
+            latest_addon_uninstalled_row: None,
+            install_addon_button: None,
+            install_addon_spinner: None,
+            active_ops: HashSet::new(),
             ..model
         };
 
@@ -294,97 +306,106 @@ impl SimpleComponent for Preferences {
             }
             Controls::SetLatestVersion(version) => {
                 self.latest_version = Some(version.clone());
+                let addon_key = format!("{version}-Addon");
+
+                // Remove placeholder once before adding any new rows.
+                if let Some(ph) = self.placeholder_row.take() {
+                    self.versions_group.remove(&ph);
+                }
+
+                // Standard variant.
                 if let Some(row) = self.version_rows.get(&version) {
-                    // Already installed — update subtitle to reflect it is the latest.
                     let sub = subtitle_for_installed(
                         &version,
                         self.current_version.as_deref(),
                         true,
                     );
                     row.set_subtitle(&sub);
-                } else {
-                    // Not installed — remove placeholder if present, add/replace latest row.
-                    if let Some(ph) = self.placeholder_row.take() {
-                        self.versions_group.remove(&ph);
-                    }
-                    if let Some(old) = self.latest_uninstalled_row.take() {
-                        self.versions_group.remove(&old);
-                        self.install_button = None;
-                        self.install_spinner = None;
-                    }
-                    let row = adw::ActionRow::new();
-                    row.set_title(&version);
-                    row.set_subtitle("latest available — not installed");
-
-                    let btn = gtk::Button::from_icon_name("folder-download-symbolic");
-                    btn.set_valign(gtk::Align::Center);
-                    btn.add_css_class("flat");
-                    btn.set_tooltip_text(Some("Download to cache"));
-                    {
-                        let v = version.clone();
-                        let s = sender.clone();
-                        btn.connect_clicked(move |_| {
-                            s.input(Controls::InstallLatestVersion(v.clone()));
-                        });
-                    }
-
-                    let spinner = gtk::Spinner::new();
-                    spinner.set_valign(gtk::Align::Center);
-
-                    let stack = gtk::Stack::new();
-                    stack.set_valign(gtk::Align::Center);
-                    stack.add_named(&btn, Some("button"));
-                    stack.add_named(&spinner, Some("spinner"));
-                    row.add_suffix(&stack);
-
+                } else if self.latest_uninstalled_row.is_none() {
+                    let (row, btn, spinner) = build_uninstalled_row(&version, &sender);
                     self.versions_group.add(&row);
                     self.latest_uninstalled_row = Some(row);
                     self.install_button = Some(btn);
                     self.install_spinner = Some(spinner);
                 }
+
+                // Addon Support variant.
+                if let Some(row) = self.version_rows.get(&addon_key) {
+                    let sub = subtitle_for_installed(
+                        &addon_key,
+                        self.current_version.as_deref(),
+                        true,
+                    );
+                    row.set_subtitle(&sub);
+                } else if self.latest_addon_uninstalled_row.is_none() {
+                    let (row, btn, spinner) = build_uninstalled_row(&addon_key, &sender);
+                    self.versions_group.add(&row);
+                    self.latest_addon_uninstalled_row = Some(row);
+                    self.install_addon_button = Some(btn);
+                    self.install_addon_spinner = Some(spinner);
+                }
             }
-            Controls::InstallLatestVersion(version) => {
-                if self.active_version_op.is_some() {
+            Controls::InstallLatestVersion(version_key) => {
+                if self.active_ops.contains(&version_key) {
                     return;
                 }
-                self.active_version_op = Some(version.clone());
-                begin_install_op(&self.install_button, &self.install_spinner);
-                sender.output(Signal::InstallVersionRequested(version)).ok();
+                self.active_ops.insert(version_key.clone());
+                if version_key.ends_with("-Addon") {
+                    begin_install_op(&self.install_addon_button, &self.install_addon_spinner);
+                } else {
+                    begin_install_op(&self.install_button, &self.install_spinner);
+                }
+                sender
+                    .output(Signal::InstallVersionRequested(version_key))
+                    .ok();
             }
             Controls::RemoveVersion(version) => {
-                if self.active_version_op.is_some() {
+                if self.active_ops.contains(&version) {
                     return;
                 }
-                self.active_version_op = Some(version.clone());
+                self.active_ops.insert(version.clone());
                 begin_version_op(&version, &self.version_buttons, &self.version_spinners);
                 sender.output(Signal::RemoveVersionRequested(version)).ok();
             }
-            Controls::VersionDownloadComplete(version) => {
-                // Stop install spinner and remove the "not installed" row.
-                finish_install_op(&self.install_button, &self.install_spinner);
-                if let Some(old) = self.latest_uninstalled_row.take() {
-                    self.versions_group.remove(&old);
-                    self.install_button = None;
-                    self.install_spinner = None;
+            Controls::VersionDownloadComplete(version_key) => {
+                let is_addon = version_key.ends_with("-Addon");
+
+                // Stop the correct install spinner and remove the correct uninstalled row.
+                if is_addon {
+                    finish_install_op(&self.install_addon_button, &self.install_addon_spinner);
+                    if let Some(old) = self.latest_addon_uninstalled_row.take() {
+                        self.versions_group.remove(&old);
+                        self.install_addon_button = None;
+                        self.install_addon_spinner = None;
+                    }
+                } else {
+                    finish_install_op(&self.install_button, &self.install_spinner);
+                    if let Some(old) = self.latest_uninstalled_row.take() {
+                        self.versions_group.remove(&old);
+                        self.install_button = None;
+                        self.install_spinner = None;
+                    }
                 }
-                // Add a new installed row for the downloaded version.
+
+                // Remove placeholder if present.
                 if let Some(ph) = self.placeholder_row.take() {
                     self.versions_group.remove(&ph);
                 }
+
                 let sub = subtitle_for_installed(
-                    &version,
+                    &version_key,
                     self.current_version.as_deref(),
                     true,
                 );
-                let is_in_use = self.versions_in_use.contains(&version);
+                let is_in_use = self.versions_in_use.contains(&version_key);
                 let (row, btn, spinner) =
-                    build_installed_row(&version, &sub, is_in_use, &sender);
+                    build_installed_row(&version_key, &sub, is_in_use, &sender);
                 self.versions_group.add(&row);
-                self.version_rows.insert(version.clone(), row);
-                self.version_buttons.insert(version.clone(), btn);
-                self.version_spinners.insert(version.clone(), spinner);
-                self.installed_versions.push(version);
-                self.active_version_op = None;
+                self.version_rows.insert(version_key.clone(), row);
+                self.version_buttons.insert(version_key.clone(), btn);
+                self.version_spinners.insert(version_key.clone(), spinner);
+                self.installed_versions.push(version_key.clone());
+                self.active_ops.remove(&version_key);
             }
             Controls::VersionRemoveComplete(version) => {
                 finish_version_op(&version, &self.version_buttons, &self.version_spinners);
@@ -394,57 +415,88 @@ impl SimpleComponent for Preferences {
                 self.version_buttons.remove(&version);
                 self.version_spinners.remove(&version);
                 self.installed_versions.retain(|v| v != &version);
-                // When the list is now empty, either restore the "latest not installed"
-                // download row (if we know the latest version) or show the placeholder.
-                if self.version_rows.is_empty() && self.latest_uninstalled_row.is_none() {
-                    if let Some(latest) = self.latest_version.clone() {
-                        // Re-add the "latest available — not installed" row with download button.
-                        let row = adw::ActionRow::new();
-                        row.set_title(&latest);
-                        row.set_subtitle("latest available — not installed");
 
-                        let btn = gtk::Button::from_icon_name("folder-download-symbolic");
-                        btn.set_valign(gtk::Align::Center);
-                        btn.add_css_class("flat");
-                        btn.set_tooltip_text(Some("Download to cache"));
-                        {
-                            let v = latest.clone();
-                            let s = sender.clone();
-                            btn.connect_clicked(move |_| {
-                                s.input(Controls::InstallLatestVersion(v.clone()));
-                            });
-                        }
-                        let spinner = gtk::Spinner::new();
-                        spinner.set_valign(gtk::Align::Center);
-                        let stack = gtk::Stack::new();
-                        stack.set_valign(gtk::Align::Center);
-                        stack.add_named(&btn, Some("button"));
-                        stack.add_named(&spinner, Some("spinner"));
-                        row.add_suffix(&stack);
-
+                // Restore the download row for the variant that was just removed.
+                let is_addon = version.ends_with("-Addon");
+                if let Some(latest) = self.latest_version.clone() {
+                    if is_addon && self.latest_addon_uninstalled_row.is_none() {
+                        let addon_key = format!("{latest}-Addon");
+                        let (row, btn, spinner) = build_uninstalled_row(&addon_key, &sender);
+                        self.versions_group.add(&row);
+                        self.latest_addon_uninstalled_row = Some(row);
+                        self.install_addon_button = Some(btn);
+                        self.install_addon_spinner = Some(spinner);
+                    } else if !is_addon && self.latest_uninstalled_row.is_none() {
+                        let (row, btn, spinner) = build_uninstalled_row(&latest, &sender);
                         self.versions_group.add(&row);
                         self.latest_uninstalled_row = Some(row);
                         self.install_button = Some(btn);
                         self.install_spinner = Some(spinner);
-                    } else {
-                        let ph = adw::ActionRow::new();
-                        ph.set_title("No versions installed");
-                        ph.set_subtitle("Install ReShade from the game detail pane");
-                        self.versions_group.add(&ph);
-                        self.placeholder_row = Some(ph);
                     }
+                } else if self.version_rows.is_empty() {
+                    // Latest version unknown and nothing left — show placeholder.
+                    let ph = adw::ActionRow::new();
+                    ph.set_title("No versions installed");
+                    ph.set_subtitle("Install ReShade from the game detail pane");
+                    self.versions_group.add(&ph);
+                    self.placeholder_row = Some(ph);
                 }
-                self.active_version_op = None;
+                self.active_ops.remove(&version);
             }
             Controls::VersionOpError(e) => {
                 log::error!("Version operation failed: {e}");
-                if let Some(version) = self.active_version_op.take() {
-                    finish_version_op(&version, &self.version_buttons, &self.version_spinners);
+                self.active_ops.clear();
+                let versions: Vec<String> = self.version_spinners.keys().cloned().collect();
+                for v in &versions {
+                    finish_version_op(v, &self.version_buttons, &self.version_spinners);
                 }
                 finish_install_op(&self.install_button, &self.install_spinner);
+                finish_install_op(&self.install_addon_button, &self.install_addon_spinner);
             }
         }
     }
+}
+
+/// Format a version key for display: `"6.7.3-Addon"` → `"6.7.3 — Addon Support"`.
+fn display_title(version_key: &str) -> String {
+    if let Some(base) = version_key.strip_suffix("-Addon") {
+        format!("{base} — Addon Support")
+    } else {
+        version_key.to_owned()
+    }
+}
+
+/// Build a "latest available — not installed" row with a download button/spinner stack.
+fn build_uninstalled_row(
+    version_key: &str,
+    sender: &ComponentSender<Preferences>,
+) -> (adw::ActionRow, gtk::Button, gtk::Spinner) {
+    let row = adw::ActionRow::new();
+    row.set_title(&display_title(version_key));
+    row.set_subtitle("latest available — not installed");
+
+    let btn = gtk::Button::from_icon_name("folder-download-symbolic");
+    btn.set_valign(gtk::Align::Center);
+    btn.add_css_class("flat");
+    btn.set_tooltip_text(Some("Download to cache"));
+    {
+        let vk = version_key.to_owned();
+        let s = sender.clone();
+        btn.connect_clicked(move |_| {
+            s.input(Controls::InstallLatestVersion(vk.clone()));
+        });
+    }
+
+    let spinner = gtk::Spinner::new();
+    spinner.set_valign(gtk::Align::Center);
+
+    let stack = gtk::Stack::new();
+    stack.set_valign(gtk::Align::Center);
+    stack.add_named(&btn, Some("button"));
+    stack.add_named(&spinner, Some("spinner"));
+    row.add_suffix(&stack);
+
+    (row, btn, spinner)
 }
 
 /// Compute the subtitle for an installed version row.
@@ -467,7 +519,7 @@ fn build_installed_row(
     sender: &ComponentSender<Preferences>,
 ) -> (adw::ActionRow, gtk::Button, gtk::Spinner) {
     let row = adw::ActionRow::new();
-    row.set_title(version);
+    row.set_title(&display_title(version));
     if !subtitle.is_empty() {
         row.set_subtitle(subtitle);
     }

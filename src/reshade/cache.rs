@@ -17,6 +17,23 @@ pub struct VersionState {
     pub installed: Vec<String>,
 }
 
+/// Parses a version key (e.g. `"6.7.3"` or `"6.7.3-Addon"`) into a sortable tuple.
+///
+/// The `-Addon` suffix sorts after the base version of the same number.
+fn parse_version_key(s: &str) -> ((u64, u64, u64), bool) {
+    let addon = s.ends_with("-Addon");
+    let base = s.strip_suffix("-Addon").unwrap_or(s);
+    let mut parts = base.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
+    (
+        (
+            parts.next().unwrap_or(0),
+            parts.next().unwrap_or(0),
+            parts.next().unwrap_or(0),
+        ),
+        addon,
+    )
+}
+
 /// Manages the `reshade_state.json` file under the iris data directory.
 pub struct UpdateCache {
     base: PathBuf,
@@ -91,17 +108,9 @@ impl UpdateCache {
         let mut state = self.read_state()?;
         if !state.installed.contains(&version.to_owned()) {
             state.installed.push(version.to_owned());
-            state.installed.sort_by(|a, b| {
-                let parse = |s: &str| -> (u64, u64, u64) {
-                    let mut parts = s.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
-                    (
-                        parts.next().unwrap_or(0),
-                        parts.next().unwrap_or(0),
-                        parts.next().unwrap_or(0),
-                    )
-                };
-                parse(a).cmp(&parse(b))
-            });
+            state
+                .installed
+                .sort_by(|a, b| parse_version_key(a).cmp(&parse_version_key(b)));
         }
         self.write_state(&state)
     }
@@ -163,6 +172,19 @@ mod tests {
         cache.add_installed("6.1.0").unwrap(); // duplicate
         let installed = cache.read_installed().unwrap();
         assert_eq!(installed, vec!["6.0.0", "6.1.0"]);
+    }
+
+    #[test]
+    fn add_installed_with_addon_key_sorts_correctly() {
+        let dir = tempdir().unwrap();
+        let cache = UpdateCache::new(dir.path().to_path_buf());
+        cache.add_installed("6.7.3-Addon").unwrap();
+        cache.add_installed("6.7.3").unwrap();
+        cache.add_installed("6.8.0").unwrap();
+        assert_eq!(
+            cache.read_installed().unwrap(),
+            vec!["6.7.3", "6.7.3-Addon", "6.8.0"]
+        );
     }
 
     #[test]

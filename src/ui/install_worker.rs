@@ -35,6 +35,8 @@ pub enum Controls {
         data_dir: PathBuf,
         /// The version string to download, e.g. `"6.1.0"`.
         version: String,
+        /// Whether to download the Addon Support variant.
+        addon: bool,
     },
 }
 
@@ -52,8 +54,8 @@ pub enum Signal {
     UninstallComplete,
     /// Version download (cache only) completed.
     DownloadVersionComplete {
-        /// The downloaded ReShade version string.
-        version: String,
+        /// The full version key, e.g. `"6.1.0"` or `"6.1.0-Addon"`.
+        version_key: String,
     },
     /// Version download (cache only) failed — carries a human-readable message.
     DownloadVersionError(String),
@@ -101,10 +103,16 @@ impl Worker for InstallWorker {
                     }
                 }
             }
-            Controls::DownloadVersion { data_dir, version } => {
+            Controls::DownloadVersion {
+                data_dir,
+                version,
+                addon,
+            } => {
                 let sender2 = sender.clone();
                 relm4::spawn(async move {
-                    if let Err(e) = do_download_version(&data_dir, &version, &sender2).await {
+                    if let Err(e) =
+                        do_download_version(&data_dir, &version, addon, &sender2).await
+                    {
                         sender2
                             .output(Signal::DownloadVersionError(e.to_string()))
                             .ok();
@@ -118,23 +126,29 @@ impl Worker for InstallWorker {
 async fn do_download_version(
     data_dir: &std::path::Path,
     version: &str,
+    addon: bool,
     sender: &ComponentSender<InstallWorker>,
 ) -> anyhow::Result<()> {
+    let dir_key = if addon {
+        format!("{version}-Addon")
+    } else {
+        version.to_owned()
+    };
     sender
-        .output(Signal::Progress(format!("Downloading ReShade {version}...")))
+        .output(Signal::Progress(format!("Downloading ReShade {dir_key}...")))
         .ok();
-    let version_dir = reshade::version_dir(data_dir, version);
+    let version_dir = reshade::version_dir(data_dir, &dir_key);
     if !version_dir.join(ExeArch::X86_64.reshade_dll()).exists() {
-        let url = reshade::download_url(version, false);
+        let url = reshade::download_url(version, addon);
         reshade::download_and_extract(&url, &version_dir).await?;
     }
     let cache = UpdateCache::new(data_dir.to_path_buf());
-    if let Err(e) = cache.add_installed(version) {
+    if let Err(e) = cache.add_installed(&dir_key) {
         log::warn!("Could not update installed versions cache: {e}");
     }
     sender
         .output(Signal::DownloadVersionComplete {
-            version: version.to_owned(),
+            version_key: dir_key,
         })
         .ok();
     Ok(())

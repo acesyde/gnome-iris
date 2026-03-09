@@ -96,6 +96,23 @@ pub fn version_dir(base: &Path, version: &str) -> PathBuf {
     base.join("reshade").join(version)
 }
 
+/// Parses a version key (e.g. `"6.7.3"` or `"6.7.3-Addon"`) into a sortable tuple.
+///
+/// The `-Addon` suffix sorts after the base version of the same number.
+fn parse_version_key(s: &str) -> ((u64, u64, u64), bool) {
+    let addon = s.ends_with("-Addon");
+    let base = s.strip_suffix("-Addon").unwrap_or(s);
+    let mut parts = base.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
+    (
+        (
+            parts.next().unwrap_or(0),
+            parts.next().unwrap_or(0),
+            parts.next().unwrap_or(0),
+        ),
+        addon,
+    )
+}
+
 /// Returns all installed ReShade versions found under `base/reshade/`,
 /// sorted in ascending semver order. The `latest` symlink is excluded.
 pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
@@ -116,17 +133,7 @@ pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
             versions.push(name.to_owned());
         }
     }
-    versions.sort_by(|a, b| {
-        let parse = |s: &str| -> (u64, u64, u64) {
-            let mut parts = s.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
-            (
-                parts.next().unwrap_or(0),
-                parts.next().unwrap_or(0),
-                parts.next().unwrap_or(0),
-            )
-        };
-        parse(a).cmp(&parse(b))
-    });
+    versions.sort_by(|a, b| parse_version_key(a).cmp(&parse_version_key(b)));
     Ok(versions)
 }
 
@@ -169,6 +176,17 @@ mod tests {
         std::os::unix::fs::symlink("6.1.0", reshade.join("stale-link")).unwrap();
         let versions = list_installed_versions(dir.path()).unwrap();
         assert_eq!(versions, vec!["6.0.0", "6.1.0"]);
+    }
+
+    #[test]
+    fn list_versions_with_addon_sorts_correctly() {
+        let dir = tempfile::tempdir().unwrap();
+        let reshade = dir.path().join("reshade");
+        std::fs::create_dir_all(reshade.join("6.7.3")).unwrap();
+        std::fs::create_dir_all(reshade.join("6.7.3-Addon")).unwrap();
+        std::fs::create_dir_all(reshade.join("6.8.0")).unwrap();
+        let versions = list_installed_versions(dir.path()).unwrap();
+        assert_eq!(versions, vec!["6.7.3", "6.7.3-Addon", "6.8.0"]);
     }
 
     #[test]
