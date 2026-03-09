@@ -38,10 +38,11 @@ pub async fn fetch_latest_version() -> Result<String> {
 
 /// Builds the download URL for a given version.
 pub fn download_url(version: &str, addon_support: bool) -> String {
+    let v = version.strip_prefix('v').unwrap_or(version);
     if addon_support {
-        format!("https://reshade.me/downloads/ReShade_Setup_{version}_Addon.exe")
+        format!("https://reshade.me/downloads/ReShade_Setup_{v}_Addon.exe")
     } else {
-        format!("https://reshade.me/downloads/ReShade_Setup_{version}.exe")
+        format!("https://reshade.me/downloads/ReShade_Setup_{v}.exe")
     }
 }
 
@@ -146,18 +147,25 @@ mod tests {
 
     #[test]
     fn build_download_url_standard() {
-        let url = download_url("6.7.3", false);
         assert_eq!(
-            url,
+            download_url("6.7.3", false),
+            "https://reshade.me/downloads/ReShade_Setup_6.7.3.exe"
+        );
+        // v-prefixed tag names (GitHub API) must be stripped
+        assert_eq!(
+            download_url("v6.7.3", false),
             "https://reshade.me/downloads/ReShade_Setup_6.7.3.exe"
         );
     }
 
     #[test]
     fn build_download_url_addon() {
-        let url = download_url("6.7.3", true);
         assert_eq!(
-            url,
+            download_url("6.7.3", true),
+            "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe"
+        );
+        assert_eq!(
+            download_url("v6.7.3", true),
             "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe"
         );
     }
