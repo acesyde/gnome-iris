@@ -1,14 +1,18 @@
 //! Global preferences page — shader repos, update interval, INI toggle.
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, SimpleComponent, adw, gtk};
 
+use crate::fl;
 use crate::reshade::config::GlobalConfig;
 
 /// Initialization payload for [`Preferences`].
 pub struct PreferencesInit {
+    /// App data directory (e.g. `~/.local/share/iris/`).
+    pub data_dir: PathBuf,
     /// Current global configuration.
     pub config: GlobalConfig,
     /// All locally installed ReShade version directories.
@@ -21,6 +25,7 @@ pub struct PreferencesInit {
 
 /// Preferences page model.
 pub struct Preferences {
+    data_dir: PathBuf,
     config: GlobalConfig,
     installed_versions: Vec<String>,
     current_version: Option<String>,
@@ -168,6 +173,7 @@ impl SimpleComponent for Preferences {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = Self {
+            data_dir: init.data_dir,
             config: init.config,
             installed_versions: init.installed_versions,
             current_version: init.current_version,
@@ -197,6 +203,23 @@ impl SimpleComponent for Preferences {
             let s = sender.clone();
             move |row: &adw::SpinRow| s.input(Controls::UpdateIntervalChanged(row.value()))
         });
+
+        // Attach an "open folder" button to the versions group header.
+        {
+            let reshade_dir = model.data_dir.join("reshade");
+            let open_btn = gtk::Button::from_icon_name("folder-open-symbolic");
+            open_btn.set_valign(gtk::Align::Center);
+            open_btn.add_css_class("flat");
+            open_btn.set_tooltip_text(Some(&fl!("open-reshade-folder")));
+            open_btn.connect_clicked(move |_| {
+                let _ = std::fs::create_dir_all(&reshade_dir);
+                std::process::Command::new("xdg-open")
+                    .arg(reshade_dir.as_os_str())
+                    .spawn()
+                    .ok();
+            });
+            widgets.versions_group.set_header_suffix(Some(&open_btn));
+        }
 
         // Populate installed versions rows imperatively (runtime data, can't use view! macro).
         let (version_rows, version_buttons, version_spinners, placeholder_row) =

@@ -160,6 +160,7 @@ impl Component for Window {
             });
         let versions_in_use = compute_versions_in_use(&games, &app_state.data_dir);
         let preferences_init = preferences::PreferencesInit {
+            data_dir: app_state.data_dir.clone(),
             config: app_state.config.clone(),
             installed_versions,
             current_version: app_state.reshade_version.clone(),
