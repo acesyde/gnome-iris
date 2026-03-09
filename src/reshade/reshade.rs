@@ -96,17 +96,6 @@ pub fn version_dir(base: &Path, version: &str) -> PathBuf {
     base.join("reshade").join(version)
 }
 
-/// Updates the `latest` symlink to point to `version_dir`.
-pub fn update_latest_symlink(base: &Path, version: &str) -> Result<()> {
-    let latest = base.join("reshade/latest");
-    let target = PathBuf::from(version);
-    if latest.exists() || latest.is_symlink() {
-        std::fs::remove_file(&latest)?;
-    }
-    std::os::unix::fs::symlink(target, latest)?;
-    Ok(())
-}
-
 /// Returns all installed ReShade versions found under `base/reshade/`,
 /// sorted in ascending semver order. The `latest` symlink is excluded.
 pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
@@ -176,7 +165,8 @@ mod tests {
         let reshade = dir.path().join("reshade");
         std::fs::create_dir_all(reshade.join("6.0.0")).unwrap();
         std::fs::create_dir_all(reshade.join("6.1.0")).unwrap();
-        std::os::unix::fs::symlink("6.1.0", reshade.join("latest")).unwrap();
+        // Symlinks (e.g. stale "latest" from old installs) must be skipped.
+        std::os::unix::fs::symlink("6.1.0", reshade.join("stale-link")).unwrap();
         let versions = list_installed_versions(dir.path()).unwrap();
         assert_eq!(versions, vec!["6.0.0", "6.1.0"]);
     }

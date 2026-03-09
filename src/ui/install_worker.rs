@@ -127,7 +127,6 @@ async fn do_download_version(
     if !version_dir.join(ExeArch::X86_64.reshade_dll()).exists() {
         let url = reshade::download_url(version, false);
         reshade::download_and_extract(&url, &version_dir).await?;
-        reshade::update_latest_symlink(data_dir, version)?;
     }
     let cache = UpdateCache::new(data_dir.to_path_buf());
     if let Err(e) = cache.add_installed(version) {
@@ -164,7 +163,6 @@ async fn do_install(
             .ok();
         let url = reshade::download_url(&version, false);
         reshade::download_and_extract(&url, &version_dir).await?;
-        reshade::update_latest_symlink(data_dir, &version)?;
     }
 
     sender
