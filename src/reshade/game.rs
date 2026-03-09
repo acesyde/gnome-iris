@@ -22,6 +22,11 @@ pub struct Game {
     pub status: InstallStatus,
     /// Per-game shader repo opt-outs.
     pub shader_overrides: ShaderOverrides,
+    /// Preferred architecture — set at add time or auto-detected from the exe.
+    ///
+    /// `None` means "use the default for the detected exe at install time".
+    #[serde(default)]
+    pub preferred_arch: Option<ExeArch>,
 }
 
 impl Game {
@@ -35,6 +40,7 @@ impl Game {
             source,
             status: InstallStatus::NotInstalled,
             shader_overrides: ShaderOverrides::default(),
+            preferred_arch: None,
         }
     }
 

@@ -10,6 +10,8 @@ use crate::reshade::game::Game;
 pub struct GameList {
     /// All games to display.
     games: Vec<Game>,
+    /// Widget ref for dynamically appending rows.
+    list_box: gtk::ListBox,
 }
 
 /// Input messages for [`GameList`].
@@ -17,6 +19,8 @@ pub struct GameList {
 pub enum Controls {
     /// Replace the full game list.
     SetGames(Vec<Game>),
+    /// Append a single game row.
+    AddGame(Game),
 }
 
 /// Output signals from [`GameList`].
@@ -53,10 +57,12 @@ impl SimpleComponent for GameList {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Self {
+        let mut model = Self {
             games: games.clone(),
+            list_box: gtk::ListBox::new(),
         };
         let widgets = view_output!();
+        model.list_box = widgets.list_box.clone();
 
         // Populate initial rows
         for game in &games {
@@ -77,6 +83,11 @@ impl SimpleComponent for GameList {
     fn update(&mut self, msg: Controls, _sender: ComponentSender<Self>) {
         match msg {
             Controls::SetGames(games) => self.games = games,
+            Controls::AddGame(game) => {
+                let row = make_game_card(&game);
+                self.list_box.append(&row);
+                self.games.push(game);
+            }
         }
     }
 }

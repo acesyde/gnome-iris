@@ -10,8 +10,9 @@ use crate::fl;
 use crate::reshade::app_state::{AppState, iris_data_dir};
 use crate::reshade::cache::UpdateCache;
 use crate::reshade::config::GlobalConfig;
-use crate::reshade::game::{Game, InstallStatus};
+use crate::reshade::game::{Game, GameSource, InstallStatus};
 use crate::reshade::reshade::list_installed_versions;
+use crate::ui::add_game_dialog;
 use crate::ui::add_shader_repo_dialog;
 use crate::ui::game_detail;
 use crate::ui::game_list;
@@ -40,6 +41,8 @@ pub struct Window {
     shader_worker: WorkerController<shader_worker::ShaderWorker>,
     /// Dialog for adding a custom shader repository.
     add_shader_repo_dialog: relm4::Controller<add_shader_repo_dialog::AddShaderRepoDialog>,
+    /// Dialog for manually adding a game.
+    add_game_dialog: relm4::Controller<add_game_dialog::AddGameDialog>,
     /// Navigation view — used to push game detail page.
     nav_view: adw::NavigationView,
     /// Toast overlay — used to surface brief error/info messages.
@@ -73,6 +76,15 @@ pub enum Controls {
     WorkerError(String),
     /// User clicked the Add Game button.
     AddGameRequested,
+    /// User confirmed adding a game via the dialog.
+    GameAdded {
+        /// Display name.
+        name: String,
+        /// Game directory.
+        path: std::path::PathBuf,
+        /// Architecture detected or chosen in the dialog.
+        arch: crate::reshade::game::ExeArch,
+    },
     /// Preferences emitted a config change; carry updated config.
     ConfigChanged(GlobalConfig),
     /// User requested downloading a shader repo from the catalog.
@@ -230,6 +242,14 @@ impl Component for Window {
                 }
             });
 
+        let add_game_dialog = add_game_dialog::AddGameDialog::builder()
+            .launch(games.iter().map(|g| g.path.clone()).collect())
+            .forward(sender.input_sender(), |sig| match sig {
+                add_game_dialog::Signal::GameAdded { name, path, arch } => {
+                    Controls::GameAdded { name, path, arch }
+                }
+            });
+
         let shader_worker = shader_worker::ShaderWorker::builder()
             .detach_worker(())
             .forward(sender.input_sender(), |sig| match sig {
@@ -338,6 +358,7 @@ impl Component for Window {
             install_worker,
             shader_worker,
             add_shader_repo_dialog,
+            add_game_dialog,
             nav_view: nav_view.clone(),
             toast_overlay: toast_overlay.clone(),
         };
@@ -446,7 +467,23 @@ impl Component for Window {
             }
 
             Controls::AddGameRequested => {
-                // TODO: open AddGameDialog
+                self.add_game_dialog.emit(add_game_dialog::Controls::Open);
+                self.add_game_dialog.widget().present(Some(root));
+            }
+
+            Controls::GameAdded { name, path, arch } => {
+                let mut game = Game::new(name, path, GameSource::Manual);
+                game.preferred_arch = Some(arch);
+                self.app_state.games.push(game.clone());
+                if let Err(e) = self.app_state.save() {
+                    log::error!("Failed to save games: {e}");
+                }
+                self.games.push(game.clone());
+                self.game_list.emit(game_list::Controls::AddGame(game));
+                // Keep the dialog's duplicate-detection list in sync.
+                let paths = self.games.iter().map(|g| g.path.clone()).collect();
+                self.add_game_dialog
+                    .emit(add_game_dialog::Controls::UpdateExistingPaths(paths));
             }
 
             Controls::ConfigChanged(config) => {
