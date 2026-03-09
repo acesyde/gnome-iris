@@ -8,8 +8,9 @@ use relm4::{
 
 use crate::fl;
 use crate::reshade::app_state::{AppState, iris_data_dir};
+use crate::reshade::cache::UpdateCache;
 use crate::reshade::config::GlobalConfig;
-use crate::reshade::game::Game;
+use crate::reshade::game::{Game, InstallStatus};
 use crate::reshade::reshade::list_installed_versions;
 use crate::ui::add_shader_repo_dialog;
 use crate::ui::game_detail;
@@ -90,6 +91,12 @@ pub enum Controls {
     ShaderRemoveCustomRepoRequested(crate::reshade::config::ShaderRepo),
     /// Latest ReShade version was fetched from GitHub; forward to Preferences.
     LatestVersionFetched(String),
+    /// Preferences requested downloading a version to the local cache.
+    VersionDownloadRequested(String),
+    /// Install worker completed a version-only download.
+    VersionDownloadComplete(String),
+    /// Preferences requested removing a cached version.
+    VersionRemoveRequested(String),
 }
 
 #[allow(missing_docs)]
@@ -149,15 +156,23 @@ impl Component for Window {
                 log::warn!("Could not list ReShade versions: {e}");
                 Vec::new()
             });
+        let versions_in_use = compute_versions_in_use(&games, &app_state.data_dir);
         let preferences_init = preferences::PreferencesInit {
             config: app_state.config.clone(),
             installed_versions,
             current_version: app_state.reshade_version.clone(),
+            versions_in_use,
         };
         let preferences = preferences::Preferences::builder()
             .launch(preferences_init)
             .forward(sender.input_sender(), |sig| match sig {
                 preferences::Signal::ConfigChanged(config) => Controls::ConfigChanged(config),
+                preferences::Signal::InstallVersionRequested(v) => {
+                    Controls::VersionDownloadRequested(v)
+                }
+                preferences::Signal::RemoveVersionRequested(v) => {
+                    Controls::VersionRemoveRequested(v)
+                }
             });
 
         let install_worker = install_worker::InstallWorker::builder()
@@ -168,6 +183,9 @@ impl Component for Window {
                     Controls::InstallComplete { version }
                 }
                 install_worker::Signal::UninstallComplete => Controls::UninstallComplete,
+                install_worker::Signal::DownloadVersionComplete { version } => {
+                    Controls::VersionDownloadComplete(version)
+                }
                 install_worker::Signal::Error(e) => Controls::WorkerError(e),
             });
 
@@ -481,6 +499,38 @@ impl Component for Window {
                     .emit(preferences::Controls::SetLatestVersion(version));
             }
 
+            Controls::VersionDownloadRequested(version) => {
+                self.install_worker
+                    .emit(install_worker::Controls::DownloadVersion {
+                        data_dir: self.app_state.data_dir.clone(),
+                        version,
+                    });
+            }
+
+            Controls::VersionDownloadComplete(version) => {
+                self.preferences
+                    .emit(preferences::Controls::VersionDownloadComplete(version));
+            }
+
+            Controls::VersionRemoveRequested(version) => {
+                let data_dir = &self.app_state.data_dir;
+                let version_dir = crate::reshade::reshade::version_dir(data_dir, &version);
+                if version_dir.exists() {
+                    if let Err(e) = std::fs::remove_dir_all(&version_dir) {
+                        log::error!("Failed to remove ReShade version {version}: {e}");
+                        self.preferences
+                            .emit(preferences::Controls::VersionOpError(e.to_string()));
+                        return;
+                    }
+                }
+                let cache = UpdateCache::new(data_dir.clone());
+                if let Err(e) = cache.remove_installed(&version) {
+                    log::warn!("Could not update installed versions cache after removal: {e}");
+                }
+                self.preferences
+                    .emit(preferences::Controls::VersionRemoveComplete(version));
+            }
+
             Controls::ShaderRepoAdded(repo) => {
                 let in_catalog = crate::reshade::catalog::KNOWN_REPOS
                     .iter()
@@ -511,4 +561,33 @@ impl Component for Window {
             }
         }
     }
+}
+
+/// Determine which cached ReShade versions are currently in use by at least one game.
+///
+/// A version is "in use" when a game's DLL symlink points into that version's directory.
+fn compute_versions_in_use(
+    games: &[Game],
+    data_dir: &std::path::Path,
+) -> std::collections::HashSet<String> {
+    let reshade_dir = data_dir.join("reshade");
+    let mut in_use = std::collections::HashSet::new();
+    for game in games {
+        if let InstallStatus::Installed { dll, .. } = &game.status {
+            let link = game.path.join(dll.symlink_name());
+            if let Ok(target) = std::fs::read_link(&link) {
+                let abs = if target.is_absolute() {
+                    target
+                } else {
+                    game.path.join(&target)
+                };
+                if let Ok(rel) = abs.strip_prefix(&reshade_dir) {
+                    if let Some(comp) = rel.components().next() {
+                        in_use.insert(comp.as_os_str().to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
+    }
+    in_use
 }

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use relm4::{ComponentSender, Worker};
 
+use crate::reshade::cache::UpdateCache;
 use crate::reshade::game::{DllOverride, ExeArch};
 use crate::reshade::{install, reshade};
 
@@ -28,6 +29,13 @@ pub enum Controls {
         /// The DLL override currently in use.
         dll: DllOverride,
     },
+    /// Download a specific ReShade version to the local cache (no game install).
+    DownloadVersion {
+        /// App data directory.
+        data_dir: PathBuf,
+        /// The version string to download, e.g. `"6.1.0"`.
+        version: String,
+    },
 }
 
 /// Output signals from the install worker.
@@ -42,6 +50,11 @@ pub enum Signal {
     },
     /// Uninstall finished successfully.
     UninstallComplete,
+    /// Version download (cache only) completed.
+    DownloadVersionComplete {
+        /// The downloaded ReShade version string.
+        version: String,
+    },
     /// An error occurred.
     Error(String),
 }
@@ -86,8 +99,42 @@ impl Worker for InstallWorker {
                     }
                 }
             }
+            Controls::DownloadVersion { data_dir, version } => {
+                let sender2 = sender.clone();
+                relm4::spawn(async move {
+                    if let Err(e) = do_download_version(&data_dir, &version, &sender2).await {
+                        sender2.output(Signal::Error(e.to_string())).ok();
+                    }
+                });
+            }
         }
     }
+}
+
+async fn do_download_version(
+    data_dir: &std::path::Path,
+    version: &str,
+    sender: &ComponentSender<InstallWorker>,
+) -> anyhow::Result<()> {
+    sender
+        .output(Signal::Progress(format!("Downloading ReShade {version}...")))
+        .ok();
+    let version_dir = reshade::version_dir(data_dir, version);
+    if !version_dir.join(ExeArch::X86_64.reshade_dll()).exists() {
+        let url = reshade::download_url(version, false);
+        reshade::download_and_extract(&url, &version_dir).await?;
+        reshade::update_latest_symlink(data_dir, version)?;
+    }
+    let cache = UpdateCache::new(data_dir.to_path_buf());
+    if let Err(e) = cache.add_installed(version) {
+        log::warn!("Could not update installed versions cache: {e}");
+    }
+    sender
+        .output(Signal::DownloadVersionComplete {
+            version: version.to_owned(),
+        })
+        .ok();
+    Ok(())
 }
 
 async fn do_install(
@@ -120,6 +167,11 @@ async fn do_install(
         .output(Signal::Progress("Installing...".into()))
         .ok();
     install::install_reshade(data_dir, game_dir, &version, dll, arch)?;
+
+    let cache = UpdateCache::new(data_dir.to_path_buf());
+    if let Err(e) = cache.add_installed(&version) {
+        log::warn!("Could not update installed versions cache: {e}");
+    }
 
     sender
         .output(Signal::InstallComplete { version })
