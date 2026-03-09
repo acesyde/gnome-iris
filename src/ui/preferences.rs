@@ -32,6 +32,8 @@ pub struct Preferences {
     version_buttons: HashMap<String, gtk::Button>,
     /// Spinners keyed by version string.
     version_spinners: HashMap<String, gtk::Spinner>,
+    /// The latest known version string (set by `SetLatestVersion`).
+    latest_version: Option<String>,
     /// Extra row shown when latest version is not locally installed.
     latest_uninstalled_row: Option<adw::ActionRow>,
     /// Download button in the "latest not installed" row.
@@ -173,6 +175,7 @@ impl SimpleComponent for Preferences {
             version_rows: HashMap::new(),
             version_buttons: HashMap::new(),
             version_spinners: HashMap::new(),
+            latest_version: None,
             latest_uninstalled_row: None,
             install_button: None,
             install_spinner: None,
@@ -267,6 +270,7 @@ impl SimpleComponent for Preferences {
                 }
             }
             Controls::SetLatestVersion(version) => {
+                self.latest_version = Some(version.clone());
                 if let Some(row) = self.version_rows.get(&version) {
                     // Already installed — update subtitle to reflect it is the latest.
                     let sub = subtitle_for_installed(
@@ -367,13 +371,45 @@ impl SimpleComponent for Preferences {
                 self.version_buttons.remove(&version);
                 self.version_spinners.remove(&version);
                 self.installed_versions.retain(|v| v != &version);
-                // Show placeholder if nothing left to display.
+                // When the list is now empty, either restore the "latest not installed"
+                // download row (if we know the latest version) or show the placeholder.
                 if self.version_rows.is_empty() && self.latest_uninstalled_row.is_none() {
-                    let ph = adw::ActionRow::new();
-                    ph.set_title("No versions installed");
-                    ph.set_subtitle("Install ReShade from the game detail pane");
-                    self.versions_group.add(&ph);
-                    self.placeholder_row = Some(ph);
+                    if let Some(latest) = self.latest_version.clone() {
+                        // Re-add the "latest available — not installed" row with download button.
+                        let row = adw::ActionRow::new();
+                        row.set_title(&latest);
+                        row.set_subtitle("latest available — not installed");
+
+                        let btn = gtk::Button::from_icon_name("folder-download-symbolic");
+                        btn.set_valign(gtk::Align::Center);
+                        btn.add_css_class("flat");
+                        btn.set_tooltip_text(Some("Download to cache"));
+                        {
+                            let v = latest.clone();
+                            let s = sender.clone();
+                            btn.connect_clicked(move |_| {
+                                s.input(Controls::InstallLatestVersion(v.clone()));
+                            });
+                        }
+                        let spinner = gtk::Spinner::new();
+                        spinner.set_valign(gtk::Align::Center);
+                        let stack = gtk::Stack::new();
+                        stack.set_valign(gtk::Align::Center);
+                        stack.add_named(&btn, Some("button"));
+                        stack.add_named(&spinner, Some("spinner"));
+                        row.add_suffix(&stack);
+
+                        self.versions_group.add(&row);
+                        self.latest_uninstalled_row = Some(row);
+                        self.install_button = Some(btn);
+                        self.install_spinner = Some(spinner);
+                    } else {
+                        let ph = adw::ActionRow::new();
+                        ph.set_title("No versions installed");
+                        ph.set_subtitle("Install ReShade from the game detail pane");
+                        self.versions_group.add(&ph);
+                        self.placeholder_row = Some(ph);
+                    }
                 }
                 self.active_version_op = None;
             }
