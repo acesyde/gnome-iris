@@ -39,21 +39,32 @@ pub async fn fetch_latest_version() -> Result<String> {
 /// Builds the download URL for a given version.
 pub fn download_url(version: &str, addon_support: bool) -> String {
     if addon_support {
-        format!("https://reshade.me/downloads/ReShade_{version}_Addon.exe")
+        format!("https://reshade.me/downloads/ReShade_Setup_{version}_Addon.exe")
     } else {
-        format!("https://reshade.me/downloads/ReShade_{version}.exe")
+        format!("https://reshade.me/downloads/ReShade_Setup_{version}.exe")
     }
 }
 
 /// Downloads a ReShade `.exe` and extracts it to `dest_dir`.
 ///
 /// The `.exe` is a self-extracting zip. We extract it directly with the `zip` crate.
+/// Returns an error on network failure, timeout, or a non-2xx HTTP status.
 pub async fn download_and_extract(url: &str, dest_dir: &Path) -> Result<()> {
-    let bytes = reqwest::get(url)
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .context("Failed to build HTTP client")?;
+    let response = client
+        .get(url)
+        .send()
         .await
-        .with_context(|| format!("Failed to download {url}"))?
+        .with_context(|| format!("Failed to connect to {url}"))?
+        .error_for_status()
+        .with_context(|| format!("Server returned an error for {url}"))?;
+    let bytes = response
         .bytes()
-        .await?;
+        .await
+        .with_context(|| format!("Failed to read response from {url}"))?;
     std::fs::create_dir_all(dest_dir)?;
     extract_zip_from_bytes(&bytes, dest_dir)?;
     Ok(())
@@ -135,14 +146,20 @@ mod tests {
 
     #[test]
     fn build_download_url_standard() {
-        let url = download_url("6.1.0", false);
-        assert_eq!(url, "https://reshade.me/downloads/ReShade_6.1.0.exe");
+        let url = download_url("6.7.3", false);
+        assert_eq!(
+            url,
+            "https://reshade.me/downloads/ReShade_Setup_6.7.3.exe"
+        );
     }
 
     #[test]
     fn build_download_url_addon() {
-        let url = download_url("6.1.0", true);
-        assert_eq!(url, "https://reshade.me/downloads/ReShade_6.1.0_Addon.exe");
+        let url = download_url("6.7.3", true);
+        assert_eq!(
+            url,
+            "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe"
+        );
     }
 
     #[test]

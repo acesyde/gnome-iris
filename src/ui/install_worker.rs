@@ -55,7 +55,9 @@ pub enum Signal {
         /// The downloaded ReShade version string.
         version: String,
     },
-    /// An error occurred.
+    /// Version download (cache only) failed — carries a human-readable message.
+    DownloadVersionError(String),
+    /// An error occurred during a game install or uninstall.
     Error(String),
 }
 
@@ -103,7 +105,9 @@ impl Worker for InstallWorker {
                 let sender2 = sender.clone();
                 relm4::spawn(async move {
                     if let Err(e) = do_download_version(&data_dir, &version, &sender2).await {
-                        sender2.output(Signal::Error(e.to_string())).ok();
+                        sender2
+                            .output(Signal::DownloadVersionError(e.to_string()))
+                            .ok();
                     }
                 });
             }

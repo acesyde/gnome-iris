@@ -95,6 +95,8 @@ pub enum Controls {
     VersionDownloadRequested(String),
     /// Install worker completed a version-only download.
     VersionDownloadComplete(String),
+    /// Install worker failed a version-only download.
+    VersionDownloadError(String),
     /// Preferences requested removing a cached version.
     VersionRemoveRequested(String),
 }
@@ -185,6 +187,9 @@ impl Component for Window {
                 install_worker::Signal::UninstallComplete => Controls::UninstallComplete,
                 install_worker::Signal::DownloadVersionComplete { version } => {
                     Controls::VersionDownloadComplete(version)
+                }
+                install_worker::Signal::DownloadVersionError(e) => {
+                    Controls::VersionDownloadError(e)
                 }
                 install_worker::Signal::Error(e) => Controls::WorkerError(e),
             });
@@ -510,6 +515,14 @@ impl Component for Window {
             Controls::VersionDownloadComplete(version) => {
                 self.preferences
                     .emit(preferences::Controls::VersionDownloadComplete(version));
+            }
+
+            Controls::VersionDownloadError(e) => {
+                log::error!("Version download failed: {e}");
+                self.preferences
+                    .emit(preferences::Controls::VersionOpError(e.clone()));
+                self.toast_overlay
+                    .add_toast(adw::Toast::new(&format!("Download failed: {e}")));
             }
 
             Controls::VersionRemoveRequested(version) => {
