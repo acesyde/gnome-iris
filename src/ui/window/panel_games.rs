@@ -127,6 +127,16 @@ pub(super) fn handle_add_game_requested(model: &mut Window, root: &adw::Applicat
     model.add_game_dialog.widget().present(Some(root));
 }
 
+/// Remove a manually added game from the list and persisted state.
+pub(super) fn handle_game_remove(model: &mut Window, id: String) {
+    model.games.retain(|g| g.id != id);
+    model.app_state.games.retain(|g| g.id != id);
+    if let Err(e) = model.app_state.save() {
+        log::error!("Failed to save games after removal: {e}");
+    }
+    model.game_list.emit(game_list::Controls::RemoveGame(id));
+}
+
 /// Log the shader toggle (backend persistence is not yet implemented).
 pub(super) fn handle_shader_toggled(
     _model: &mut Window,

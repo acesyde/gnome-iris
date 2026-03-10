@@ -62,6 +62,8 @@ pub struct Window {
 pub enum Controls {
     /// A game was selected in the list.
     GameSelected(String),
+    /// User requested removal of a manually added game.
+    GameRemoveRequested(String),
     /// GameDetail requested installation.
     Install {
         game_id: String,
@@ -168,6 +170,7 @@ impl Component for Window {
             .launch(games.clone())
             .forward(sender.input_sender(), |sig| match sig {
                 game_list::Signal::GameSelected(id) => Controls::GameSelected(id),
+                game_list::Signal::GameRemoveRequested(id) => Controls::GameRemoveRequested(id),
             });
 
         let game_detail = game_detail::GameDetail::builder()
@@ -429,6 +432,7 @@ impl Component for Window {
     fn update(&mut self, msg: Controls, _sender: ComponentSender<Self>, root: &Self::Root) {
         match msg {
             Controls::GameSelected(id) => panel_games::handle_game_selected(self, id),
+            Controls::GameRemoveRequested(id) => panel_games::handle_game_remove(self, id),
             Controls::Install { game_id, dll, arch } => {
                 panel_games::handle_install(self, game_id, dll, arch);
             }
