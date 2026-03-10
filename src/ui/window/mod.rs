@@ -50,6 +50,10 @@ pub struct Window {
     nav_view: adw::NavigationView,
     /// Toast overlay — used to surface brief error/info messages.
     toast_overlay: adw::ToastOverlay,
+    /// DLL + arch of the in-flight install (fixes hardcoded values in `handle_install_complete`).
+    pending_install: Option<(crate::reshade::game::DllOverride, crate::reshade::game::ExeArch)>,
+    /// ID of the game currently shown in the detail pane (for config refresh).
+    current_game_id: Option<String>,
 }
 
 /// Input messages for [`Window`].
@@ -114,6 +118,15 @@ pub enum Controls {
     VersionDownloadError(String),
     /// Preferences requested removing a cached version.
     VersionRemoveRequested(String),
+    /// Per-game shader repo toggle forwarded from the detail pane.
+    ShaderToggled {
+        /// Stable game ID.
+        game_id: String,
+        /// Repository local name.
+        repo_name: String,
+        /// New enabled state.
+        enabled: bool,
+    },
 }
 
 #[allow(missing_docs)]
@@ -165,6 +178,9 @@ impl Component for Window {
                 }
                 game_detail::Signal::Uninstall { game_id, dll } => {
                     Controls::Uninstall { game_id, dll }
+                }
+                game_detail::Signal::ShaderToggled { game_id, repo_name, enabled } => {
+                    Controls::ShaderToggled { game_id, repo_name, enabled }
                 }
             });
 
@@ -364,6 +380,8 @@ impl Component for Window {
             add_game_dialog,
             nav_view: nav_view.clone(),
             toast_overlay: toast_overlay.clone(),
+            pending_install: None,
+            current_game_id: None,
         };
 
         let nav_view = &nav_view;
@@ -457,6 +475,9 @@ impl Component for Window {
             }
             Controls::VersionRemoveRequested(version) => {
                 panel_preferences::handle_version_remove_requested(self, version);
+            }
+            Controls::ShaderToggled { game_id, repo_name, enabled } => {
+                panel_games::handle_shader_toggled(self, game_id, repo_name, enabled);
             }
         }
     }

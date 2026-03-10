@@ -7,6 +7,7 @@ use relm4::adw::prelude::*;
 use relm4::ComponentController;
 
 use crate::reshade::app_state::iris_data_dir;
+use crate::reshade::catalog::KNOWN_REPOS;
 use crate::reshade::game::{DllOverride, ExeArch, Game, GameSource};
 use crate::ui::{add_game_dialog, game_detail, game_list, install_worker};
 
@@ -14,11 +15,37 @@ use super::Window;
 
 /// Navigate to the detail page for the selected game.
 pub(super) fn handle_game_selected(model: &mut Window, id: String) {
-    if let Some(game) = model.games.iter().find(|g| g.id == id) {
+    if let Some(game) = model.games.iter().find(|g| g.id == id).cloned() {
         model
             .game_detail
             .emit(game_detail::Controls::SetGame(game.clone()));
+        let repos_dir = model.app_state.data_dir.join("ReShade_shaders");
+        let known_names: std::collections::HashSet<&str> =
+            KNOWN_REPOS.iter().map(|e| e.local_name).collect();
+        let downloaded_repos = KNOWN_REPOS
+            .iter()
+            .filter(|e| repos_dir.join(e.local_name).is_dir())
+            .map(crate::reshade::catalog::CatalogEntry::to_shader_repo)
+            .chain(
+                model
+                    .app_state
+                    .config
+                    .shader_repos
+                    .iter()
+                    .filter(|r| {
+                        !known_names.contains(r.local_name.as_str())
+                            && repos_dir.join(&r.local_name).is_dir()
+                    })
+                    .cloned(),
+            )
+            .collect();
+        model.game_detail.emit(game_detail::Controls::SetShaderData {
+            repos: downloaded_repos,
+            overrides: game.shader_overrides,
+            reshade_version: model.app_state.reshade_version.clone(),
+        });
         model.nav_view.push(model.game_detail.widget());
+        model.current_game_id = Some(id);
     }
 }
 
@@ -37,6 +64,7 @@ pub(super) fn handle_install(
             dll,
             arch,
         });
+        model.pending_install = Some((dll, arch));
     }
 }
 
@@ -61,13 +89,17 @@ pub(super) fn handle_progress(model: &mut Window, msg: String) {
 
 /// Clear progress and mark the game as installed.
 pub(super) fn handle_install_complete(model: &mut Window, version: String) {
+    let (dll, arch) = model
+        .pending_install
+        .take()
+        .unwrap_or((DllOverride::Dxgi, ExeArch::X86_64));
     model
         .game_detail
         .emit(game_detail::Controls::ClearProgress);
     model.game_detail.emit(game_detail::Controls::MarkInstalled {
         version,
-        dll: DllOverride::Dxgi,
-        arch: ExeArch::X86_64,
+        dll,
+        arch,
     });
 }
 
@@ -93,6 +125,16 @@ pub(super) fn handle_worker_error(model: &mut Window, e: String) {
 pub(super) fn handle_add_game_requested(model: &mut Window, root: &adw::ApplicationWindow) {
     model.add_game_dialog.emit(add_game_dialog::Controls::Open);
     model.add_game_dialog.widget().present(Some(root));
+}
+
+/// Log the shader toggle (backend persistence is not yet implemented).
+pub(super) fn handle_shader_toggled(
+    _model: &mut Window,
+    game_id: String,
+    repo_name: String,
+    enabled: bool,
+) {
+    log::info!("Shader toggle: game={game_id} repo={repo_name} enabled={enabled}");
 }
 
 /// Persist the new game and add it to the list.

@@ -4,12 +4,16 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk};
 
 use crate::fl;
+use crate::reshade::config::{ShaderOverrides, ShaderRepo};
 use crate::reshade::game::{DllOverride, ExeArch, Game, InstallStatus};
 
 /// Game detail pane model.
 pub struct GameDetail {
     game: Option<Game>,
     progress_message: Option<String>,
+    shader_repos: Vec<ShaderRepo>,
+    reshade_version: Option<String>,
+    shader_list: gtk::ListBox,
 }
 
 /// Input messages for [`GameDetail`].
@@ -34,6 +38,26 @@ pub enum Controls {
     },
     /// Mark the currently shown game as uninstalled.
     MarkUninstalled,
+    /// Replace shader rows for the displayed game.
+    SetShaderData {
+        /// Available shader repositories.
+        repos: Vec<ShaderRepo>,
+        /// Per-game shader overrides.
+        overrides: ShaderOverrides,
+        /// Currently installed ReShade version string.
+        reshade_version: Option<String>,
+    },
+    /// Internal: install button clicked — `update()` reads `self.game`.
+    InstallRequested,
+    /// Internal: uninstall button clicked — `update()` reads `self.game`.
+    UninstallRequested,
+    /// Internal: shader switch toggled — `update()` emits the output signal.
+    ShaderToggled {
+        /// Repository local name.
+        repo_name: String,
+        /// New enabled state.
+        enabled: bool,
+    },
 }
 
 /// Output signals from [`GameDetail`].
@@ -55,6 +79,59 @@ pub enum Signal {
         /// Current DLL override.
         dll: DllOverride,
     },
+    /// Per-game shader repo toggled.
+    ShaderToggled {
+        /// Stable game ID.
+        game_id: String,
+        /// Repository local name.
+        repo_name: String,
+        /// New enabled state.
+        enabled: bool,
+    },
+}
+
+impl GameDetail {
+    /// Build the metadata subtitle string shown below the game title.
+    fn metadata_subtitle(&self) -> String {
+        let Some(game) = &self.game else {
+            return String::new();
+        };
+        match &game.status {
+            InstallStatus::NotInstalled => fl!("not-installed"),
+            InstallStatus::Installed { dll, arch } => {
+                let arch_str = match arch {
+                    ExeArch::X86 => "x86",
+                    ExeArch::X86_64 => "x86_64",
+                };
+                let version = self.reshade_version.as_deref().unwrap_or("?");
+                format!("{arch_str} \u{00B7} {dll} \u{00B7} ReShade {version}")
+            }
+        }
+    }
+
+    /// Clear and repopulate the shader list box from `self.shader_repos`.
+    fn rebuild_shader_rows(&self, sender: &ComponentSender<Self>) {
+        while let Some(child) = self.shader_list.first_child() {
+            self.shader_list.remove(&child);
+        }
+        if self.game.is_none() {
+            return;
+        }
+        for repo in &self.shader_repos {
+            let row = adw::SwitchRow::new();
+            row.set_title(&repo.local_name);
+            row.set_active(false);
+            let s = sender.clone();
+            let name = repo.local_name.clone();
+            row.connect_active_notify(move |r| {
+                s.input(Controls::ShaderToggled {
+                    repo_name: name.clone(),
+                    enabled: r.is_active(),
+                });
+            });
+            self.shader_list.append(&row);
+        }
+    }
 }
 
 #[allow(missing_docs)]
@@ -74,97 +151,116 @@ impl SimpleComponent for GameDetail {
                 add_top_bar = &adw::HeaderBar {},
 
                 #[wrap(Some)]
-                set_content = &gtk::Box {
-                    set_orientation: gtk::Orientation::Vertical,
-                    set_margin_all: 24,
-                    set_spacing: 16,
+                set_content = &gtk::ScrolledWindow {
+                    set_vexpand: true,
+                    set_hscrollbar_policy: gtk::PolicyType::Never,
 
-                    // Empty state
-                    adw::StatusPage {
-                        set_title: &fl!("select-a-game"),
-                        set_icon_name: Some("view-list-symbolic"),
-                        set_vexpand: true,
-                        #[watch]
-                        set_visible: model.game.is_none(),
-                    },
-
-                    // Game content
-                    gtk::Box {
+                    #[wrap(Some)]
+                    set_child = &gtk::Box {
                         set_orientation: gtk::Orientation::Vertical,
-                        set_spacing: 12,
-                        set_vexpand: true,
-                        #[watch]
-                        set_visible: model.game.is_some(),
+                        set_margin_all: 24,
+                        set_spacing: 24,
 
-                        gtk::Label {
-                            add_css_class: "title-1",
+                        // Empty state
+                        adw::StatusPage {
+                            set_title: &fl!("select-a-game"),
+                            set_icon_name: Some("view-list-symbolic"),
+                            set_vexpand: true,
                             #[watch]
-                            set_label: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or(""),
-                            set_xalign: 0.0,
+                            set_visible: model.game.is_none(),
                         },
 
-                        gtk::Label {
-                            add_css_class: "caption",
-                            set_xalign: 0.0,
-                            set_ellipsize: gtk::pango::EllipsizeMode::Middle,
-                            #[watch]
-                            set_label: model
-                                .game
-                                .as_ref()
-                                .map(|g| g.path.to_string_lossy().into_owned())
-                                .unwrap_or_default()
-                                .as_str(),
-                        },
-
-                        // Progress banner
-                        adw::Banner {
-                            #[watch]
-                            set_title: model.progress_message.as_deref().unwrap_or(""),
-                            #[watch]
-                            set_revealed: model.progress_message.is_some(),
-                        },
-
-                        // Action buttons
+                        // Content box
                         gtk::Box {
-                            set_orientation: gtk::Orientation::Horizontal,
-                            set_spacing: 8,
+                            set_orientation: gtk::Orientation::Vertical,
+                            set_spacing: 24,
+                            #[watch]
+                            set_visible: model.game.is_some(),
 
-                            gtk::Button {
-                                set_label: &fl!("install"),
-                                add_css_class: "suggested-action",
-                                #[watch]
-                                set_visible: model
-                                    .game
-                                    .as_ref()
-                                    .map(|g| !g.status.is_installed())
-                                    .unwrap_or(true),
-                                connect_clicked[sender] => move |_| {
-                                    sender
-                                        .output(Signal::Install {
-                                            game_id: String::new(),
-                                            dll: DllOverride::Dxgi,
-                                            arch: ExeArch::X86_64,
-                                        })
-                                        .ok();
+                            // Header (centered)
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                                set_halign: gtk::Align::Center,
+                                set_spacing: 4,
+
+                                gtk::Label {
+                                    add_css_class: "title-1",
+                                    set_halign: gtk::Align::Center,
+                                    #[watch]
+                                    set_label: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or(""),
+                                },
+
+                                gtk::Label {
+                                    add_css_class: "caption",
+                                    add_css_class: "dim-label",
+                                    set_halign: gtk::Align::Center,
+                                    #[watch]
+                                    set_label: &model.metadata_subtitle(),
                                 },
                             },
 
-                            gtk::Button {
-                                set_label: &fl!("uninstall"),
-                                add_css_class: "destructive-action",
+                            // Progress banner
+                            adw::Banner {
                                 #[watch]
-                                set_visible: model
-                                    .game
-                                    .as_ref()
-                                    .map(|g| g.status.is_installed())
-                                    .unwrap_or(false),
-                                connect_clicked[sender] => move |_| {
-                                    sender
-                                        .output(Signal::Uninstall {
-                                            game_id: String::new(),
-                                            dll: DllOverride::Dxgi,
-                                        })
-                                        .ok();
+                                set_title: model.progress_message.as_deref().unwrap_or(""),
+                                #[watch]
+                                set_revealed: model.progress_message.is_some(),
+                            },
+
+                            // Action buttons (centered, pill-shaped)
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Horizontal,
+                                set_halign: gtk::Align::Center,
+                                set_spacing: 12,
+
+                                gtk::Button {
+                                    set_label: &fl!("install"),
+                                    add_css_class: "suggested-action",
+                                    add_css_class: "pill",
+                                    #[watch]
+                                    set_visible: model
+                                        .game
+                                        .as_ref()
+                                        .map(|g| !g.status.is_installed())
+                                        .unwrap_or(true),
+                                    connect_clicked[sender] => move |_| {
+                                        sender.input(Controls::InstallRequested);
+                                    },
+                                },
+
+                                gtk::Button {
+                                    set_label: &fl!("uninstall"),
+                                    add_css_class: "destructive-action",
+                                    add_css_class: "pill",
+                                    #[watch]
+                                    set_visible: model
+                                        .game
+                                        .as_ref()
+                                        .map(|g| g.status.is_installed())
+                                        .unwrap_or(false),
+                                    connect_clicked[sender] => move |_| {
+                                        sender.input(Controls::UninstallRequested);
+                                    },
+                                },
+                            },
+
+                            // Shaders section
+                            gtk::Box {
+                                set_orientation: gtk::Orientation::Vertical,
+                                set_spacing: 8,
+                                #[watch]
+                                set_visible: !model.shader_repos.is_empty(),
+
+                                gtk::Label {
+                                    add_css_class: "heading",
+                                    set_halign: gtk::Align::Start,
+                                    set_label: &fl!("shaders-section"),
+                                },
+
+                                #[name(shader_list)]
+                                gtk::ListBox {
+                                    set_selection_mode: gtk::SelectionMode::None,
+                                    add_css_class: "boxed-list",
                                 },
                             },
                         },
@@ -179,17 +275,25 @@ impl SimpleComponent for GameDetail {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
-        let model = Self {
+        let mut model = Self {
             game: None,
             progress_message: None,
+            shader_repos: Vec::new(),
+            reshade_version: None,
+            shader_list: gtk::ListBox::new(),
         };
         let widgets = view_output!();
+        // Replace the placeholder with the real widget from the view tree.
+        model.shader_list = widgets.shader_list.clone();
         ComponentParts { model, widgets }
     }
 
-    fn update(&mut self, msg: Controls, _sender: ComponentSender<Self>) {
+    fn update(&mut self, msg: Controls, sender: ComponentSender<Self>) {
         match msg {
-            Controls::SetGame(game) => self.game = Some(game),
+            Controls::SetGame(game) => {
+                self.game = Some(game);
+                self.rebuild_shader_rows(&sender);
+            }
             Controls::Clear => self.game = None,
             Controls::SetProgress(msg) => self.progress_message = Some(msg),
             Controls::ClearProgress => self.progress_message = None,
@@ -201,6 +305,47 @@ impl SimpleComponent for GameDetail {
             Controls::MarkUninstalled => {
                 if let Some(game) = &mut self.game {
                     game.status = InstallStatus::NotInstalled;
+                }
+            }
+            Controls::SetShaderData { repos, overrides, reshade_version } => {
+                self.shader_repos = repos;
+                self.reshade_version = reshade_version;
+                if let Some(game) = &mut self.game {
+                    game.shader_overrides = overrides;
+                }
+                self.rebuild_shader_rows(&sender);
+            }
+            Controls::InstallRequested => {
+                if let Some(game) = &self.game {
+                    let (dll, arch) = match &game.status {
+                        InstallStatus::Installed { dll, arch } => (*dll, *arch),
+                        InstallStatus::NotInstalled => {
+                            (DllOverride::Dxgi, game.preferred_arch.unwrap_or(ExeArch::X86_64))
+                        }
+                    };
+                    sender
+                        .output(Signal::Install { game_id: game.id.clone(), dll, arch })
+                        .ok();
+                }
+            }
+            Controls::UninstallRequested => {
+                if let Some(game) = &self.game
+                    && let InstallStatus::Installed { dll, .. } = &game.status
+                {
+                    sender
+                        .output(Signal::Uninstall { game_id: game.id.clone(), dll: *dll })
+                        .ok();
+                }
+            }
+            Controls::ShaderToggled { repo_name, enabled } => {
+                if let Some(game) = &self.game {
+                    sender
+                        .output(Signal::ShaderToggled {
+                            game_id: game.id.clone(),
+                            repo_name,
+                            enabled,
+                        })
+                        .ok();
                 }
             }
         }
