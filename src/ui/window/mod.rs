@@ -1,5 +1,9 @@
 //! Root application window — wires all UI components together.
 
+mod panel_games;
+mod panel_preferences;
+mod panel_shaders;
+
 use relm4::adw::prelude::*;
 use relm4::{
     Component, ComponentController, ComponentParts, ComponentSender, Controller,
@@ -7,10 +11,9 @@ use relm4::{
 };
 
 use crate::fl;
-use crate::reshade::app_state::{AppState, iris_data_dir};
-use crate::reshade::cache::UpdateCache;
+use crate::reshade::app_state::AppState;
 use crate::reshade::config::GlobalConfig;
-use crate::reshade::game::{Game, GameSource, InstallStatus};
+use crate::reshade::game::{Game, InstallStatus};
 use crate::reshade::reshade::list_installed_versions;
 use crate::ui::add_game_dialog;
 use crate::ui::add_shader_repo_dialog;
@@ -407,215 +410,53 @@ impl Component for Window {
 
     fn update(&mut self, msg: Controls, _sender: ComponentSender<Self>, root: &Self::Root) {
         match msg {
-            Controls::GameSelected(id) => {
-                if let Some(game) = self.games.iter().find(|g| g.id == id) {
-                    self.game_detail
-                        .emit(game_detail::Controls::SetGame(game.clone()));
-                    self.nav_view.push(self.game_detail.widget());
-                }
-            }
-
+            Controls::GameSelected(id) => panel_games::handle_game_selected(self, id),
             Controls::Install { game_id, dll, arch } => {
-                if let Some(game) = self.games.iter().find(|g| g.id == game_id) {
-                    let data_dir = iris_data_dir();
-                    self.install_worker
-                        .emit(install_worker::Controls::Install {
-                            data_dir,
-                            game_dir: game.path.clone(),
-                            dll,
-                            arch,
-                        });
-                }
+                panel_games::handle_install(self, game_id, dll, arch);
             }
-
             Controls::Uninstall { game_id, dll } => {
-                if let Some(game) = self.games.iter().find(|g| g.id == game_id) {
-                    self.install_worker
-                        .emit(install_worker::Controls::Uninstall {
-                            game_dir: game.path.clone(),
-                            dll,
-                        });
-                }
+                panel_games::handle_uninstall(self, game_id, dll);
             }
-
-            Controls::Progress(msg) => {
-                self.game_detail
-                    .emit(game_detail::Controls::SetProgress(msg));
-            }
-
+            Controls::Progress(msg) => panel_games::handle_progress(self, msg),
             Controls::InstallComplete { version } => {
-                self.game_detail
-                    .emit(game_detail::Controls::ClearProgress);
-                self.game_detail.emit(game_detail::Controls::MarkInstalled {
-                    version,
-                    dll: crate::reshade::game::DllOverride::Dxgi,
-                    arch: crate::reshade::game::ExeArch::X86_64,
-                });
+                panel_games::handle_install_complete(self, version);
             }
-
-            Controls::UninstallComplete => {
-                self.game_detail
-                    .emit(game_detail::Controls::ClearProgress);
-                self.game_detail
-                    .emit(game_detail::Controls::MarkUninstalled);
-            }
-
-            Controls::WorkerError(e) => {
-                log::error!("Install worker error: {e}");
-                self.game_detail
-                    .emit(game_detail::Controls::SetProgress(format!("Error: {e}")));
-            }
-
-            Controls::AddGameRequested => {
-                self.add_game_dialog.emit(add_game_dialog::Controls::Open);
-                self.add_game_dialog.widget().present(Some(root));
-            }
-
+            Controls::UninstallComplete => panel_games::handle_uninstall_complete(self),
+            Controls::WorkerError(e) => panel_games::handle_worker_error(self, e),
+            Controls::AddGameRequested => panel_games::handle_add_game_requested(self, root),
             Controls::GameAdded { name, path, arch } => {
-                let mut game = Game::new(name, path, GameSource::Manual);
-                game.preferred_arch = Some(arch);
-                self.app_state.games.push(game.clone());
-                if let Err(e) = self.app_state.save() {
-                    log::error!("Failed to save games: {e}");
-                }
-                self.games.push(game.clone());
-                self.game_list.emit(game_list::Controls::AddGame(game));
-                // Keep the dialog's duplicate-detection list in sync.
-                let paths = self.games.iter().map(|g| g.path.clone()).collect();
-                self.add_game_dialog
-                    .emit(add_game_dialog::Controls::UpdateExistingPaths(paths));
+                panel_games::handle_game_added(self, name, path, arch);
             }
-
             Controls::ConfigChanged(config) => {
-                self.app_state.config = config;
-                if let Err(e) = self.app_state.save() {
-                    log::error!("Failed to save config: {e}");
-                }
+                panel_preferences::handle_config_changed(self, config);
             }
-
             Controls::ShaderDownloadRequested(repo) => {
-                let data_dir = self.app_state.data_dir.clone();
-                self.shader_worker
-                    .emit(shader_worker::Controls::SyncOne { repo, data_dir });
+                panel_shaders::handle_download_requested(self, repo);
             }
-            Controls::ShaderProgress(msg) => {
-                self.shader_catalog
-                    .emit(shader_catalog::Controls::SyncProgress(msg));
-            }
-            Controls::ShaderSyncComplete => {
-                self.shader_catalog
-                    .emit(shader_catalog::Controls::SyncComplete);
-            }
-            Controls::ShaderSyncError(e) => {
-                self.shader_catalog
-                    .emit(shader_catalog::Controls::SyncError(e));
-            }
+            Controls::ShaderProgress(msg) => panel_shaders::handle_progress(self, msg),
+            Controls::ShaderSyncComplete => panel_shaders::handle_sync_complete(self),
+            Controls::ShaderSyncError(e) => panel_shaders::handle_sync_error(self, e),
             Controls::ShaderAddCustomRepoRequested => {
-                self.add_shader_repo_dialog.widget().present(Some(root));
+                panel_shaders::handle_add_custom_repo_requested(self, root);
             }
             Controls::ShaderRemoveCustomRepoRequested(repo) => {
-                // Remove from persisted config.
-                self.app_state
-                    .config
-                    .shader_repos
-                    .retain(|r| r.local_name != repo.local_name);
-                if let Err(e) = self.app_state.save() {
-                    log::error!("Failed to save config after removing custom repo: {e}");
-                }
-                // Delete cloned data from disk.
-                let repo_dir = self
-                    .app_state
-                    .data_dir
-                    .join("ReShade_shaders")
-                    .join(&repo.local_name);
-                if repo_dir.exists() {
-                    if let Err(e) = std::fs::remove_dir_all(&repo_dir) {
-                        log::error!("Failed to delete repo directory {}: {e}", repo_dir.display());
-                    }
-                }
-                // Tell the catalog to remove the row.
-                self.shader_catalog
-                    .emit(shader_catalog::Controls::RemoveCustomRepo(repo));
+                panel_shaders::handle_remove_custom_repo_requested(self, repo);
             }
+            Controls::ShaderRepoAdded(repo) => panel_shaders::handle_repo_added(self, repo),
             Controls::LatestVersionFetched(version) => {
-                self.preferences
-                    .emit(preferences::Controls::SetLatestVersion(version));
+                panel_preferences::handle_latest_version_fetched(self, version);
             }
-
             Controls::VersionDownloadRequested(version_key) => {
-                let (version, addon) =
-                    if let Some(base) = version_key.strip_suffix("-Addon") {
-                        (base.to_owned(), true)
-                    } else {
-                        (version_key.clone(), false)
-                    };
-                self.install_worker
-                    .emit(install_worker::Controls::DownloadVersion {
-                        data_dir: self.app_state.data_dir.clone(),
-                        version,
-                        addon,
-                    });
+                panel_preferences::handle_version_download_requested(self, version_key);
             }
-
             Controls::VersionDownloadComplete(version) => {
-                self.preferences
-                    .emit(preferences::Controls::VersionDownloadComplete(version));
+                panel_preferences::handle_version_download_complete(self, version);
             }
-
             Controls::VersionDownloadError(e) => {
-                log::error!("Version download failed: {e}");
-                self.preferences
-                    .emit(preferences::Controls::VersionOpError(e.clone()));
-                self.toast_overlay
-                    .add_toast(adw::Toast::new(&format!("Download failed: {e}")));
+                panel_preferences::handle_version_download_error(self, e);
             }
-
             Controls::VersionRemoveRequested(version) => {
-                let data_dir = &self.app_state.data_dir;
-                let version_dir = crate::reshade::reshade::version_dir(data_dir, &version);
-                if version_dir.exists() {
-                    if let Err(e) = std::fs::remove_dir_all(&version_dir) {
-                        log::error!("Failed to remove ReShade version {version}: {e}");
-                        self.preferences
-                            .emit(preferences::Controls::VersionOpError(e.to_string()));
-                        return;
-                    }
-                }
-                let cache = UpdateCache::new(data_dir.clone());
-                if let Err(e) = cache.remove_installed(&version) {
-                    log::warn!("Could not update installed versions cache after removal: {e}");
-                }
-                self.preferences
-                    .emit(preferences::Controls::VersionRemoveComplete(version));
-            }
-
-            Controls::ShaderRepoAdded(repo) => {
-                let in_catalog = crate::reshade::catalog::KNOWN_REPOS
-                    .iter()
-                    .any(|e| e.url == repo.url || e.local_name == repo.local_name);
-                if in_catalog {
-                    self.toast_overlay.add_toast(adw::Toast::new(
-                        "This repository is already in the known catalog.",
-                    ));
-                    return;
-                }
-                let already = self
-                    .app_state
-                    .config
-                    .shader_repos
-                    .iter()
-                    .any(|r| r.url == repo.url || r.local_name == repo.local_name);
-                if already {
-                    self.toast_overlay
-                        .add_toast(adw::Toast::new("This repository has already been added."));
-                    return;
-                }
-                self.app_state.config.shader_repos.push(repo.clone());
-                if let Err(e) = self.app_state.save() {
-                    log::error!("Failed to save config after adding custom repo: {e}");
-                }
-                self.shader_catalog
-                    .emit(shader_catalog::Controls::AddCustomRepo(repo));
+                panel_preferences::handle_version_remove_requested(self, version);
             }
         }
     }
