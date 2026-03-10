@@ -1,4 +1,4 @@
-//! Scrollable list of game cards.
+//! Scrollable list of game cards, split into auto-detected and manually added sections.
 
 use std::collections::HashMap;
 
@@ -12,10 +12,16 @@ use crate::reshade::game::{Game, GameSource};
 pub struct GameList {
     /// All games to display.
     games: Vec<Game>,
-    /// Widget ref for dynamically appending rows.
-    list_box: gtk::ListBox,
-    /// Row widgets keyed by game ID — needed for imperative removal.
-    rows: HashMap<String, adw::ActionRow>,
+    /// Whether at least one manually added game exists (drives section visibility).
+    has_manual: bool,
+    /// List box for auto-detected games.
+    auto_list_box: gtk::ListBox,
+    /// List box for manually added games.
+    manual_list_box: gtk::ListBox,
+    /// Row widgets for auto-detected games, keyed by game ID.
+    auto_rows: HashMap<String, adw::ActionRow>,
+    /// Row widgets for manually added games, keyed by game ID.
+    manual_rows: HashMap<String, adw::ActionRow>,
 }
 
 /// Input messages for [`GameList`].
@@ -50,12 +56,50 @@ impl SimpleComponent for GameList {
             set_vexpand: true,
             set_hscrollbar_policy: gtk::PolicyType::Never,
 
-            #[name(list_box)]
-            gtk::ListBox {
-                set_selection_mode: gtk::SelectionMode::None,
-                add_css_class: "boxed-list",
+            gtk::Box {
+                set_orientation: gtk::Orientation::Vertical,
+                set_spacing: 18,
                 set_margin_all: 12,
-                set_valign: gtk::Align::Start,
+
+                // Auto-detected section
+                gtk::Box {
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_spacing: 8,
+
+                    gtk::Label {
+                        add_css_class: "heading",
+                        set_halign: gtk::Align::Start,
+                        set_label: "Autodetected",
+                    },
+
+                    #[name(auto_list_box)]
+                    gtk::ListBox {
+                        set_selection_mode: gtk::SelectionMode::None,
+                        add_css_class: "boxed-list",
+                        set_valign: gtk::Align::Start,
+                    },
+                },
+
+                // Manually added section — hidden until at least one game exists
+                gtk::Box {
+                    set_orientation: gtk::Orientation::Vertical,
+                    set_spacing: 8,
+                    #[watch]
+                    set_visible: model.has_manual,
+
+                    gtk::Label {
+                        add_css_class: "heading",
+                        set_halign: gtk::Align::Start,
+                        set_label: "Manually added",
+                    },
+
+                    #[name(manual_list_box)]
+                    gtk::ListBox {
+                        set_selection_mode: gtk::SelectionMode::None,
+                        add_css_class: "boxed-list",
+                        set_valign: gtk::Align::Start,
+                    },
+                },
             },
         }
     }
@@ -65,29 +109,39 @@ impl SimpleComponent for GameList {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let has_manual = games.iter().any(|g| matches!(g.source, GameSource::Manual));
         let mut model = Self {
             games: games.clone(),
-            list_box: gtk::ListBox::new(),
-            rows: HashMap::new(),
+            has_manual,
+            auto_list_box: gtk::ListBox::new(),
+            manual_list_box: gtk::ListBox::new(),
+            auto_rows: HashMap::new(),
+            manual_rows: HashMap::new(),
         };
         let widgets = view_output!();
-        model.list_box = widgets.list_box.clone();
+        model.auto_list_box = widgets.auto_list_box.clone();
+        model.manual_list_box = widgets.manual_list_box.clone();
 
-        // Populate initial rows.
         for game in &games {
             let row = build_game_row(game, &sender);
-            widgets.list_box.append(&row);
-            model.rows.insert(game.id.clone(), row);
+            if matches!(game.source, GameSource::Manual) {
+                widgets.manual_list_box.append(&row);
+                model.manual_rows.insert(game.id.clone(), row);
+            } else {
+                widgets.auto_list_box.append(&row);
+                model.auto_rows.insert(game.id.clone(), row);
+            }
         }
 
-        // Emit selection signal when a row is activated.
-        widgets.list_box.connect_row_activated({
+        let connect_selection = |list_box: &gtk::ListBox| {
             let s = sender.clone();
-            move |_, row| {
+            list_box.connect_row_activated(move |_, row| {
                 let id = row.widget_name().to_string();
                 s.output(Signal::GameSelected(id)).ok();
-            }
-        });
+            });
+        };
+        connect_selection(&widgets.auto_list_box);
+        connect_selection(&widgets.manual_list_box);
 
         ComponentParts { model, widgets }
     }
@@ -97,15 +151,24 @@ impl SimpleComponent for GameList {
             Controls::SetGames(games) => self.games = games,
             Controls::AddGame(game) => {
                 let row = build_game_row(&game, &sender);
-                self.list_box.append(&row);
-                self.rows.insert(game.id.clone(), row);
+                if matches!(game.source, GameSource::Manual) {
+                    self.manual_list_box.append(&row);
+                    self.manual_rows.insert(game.id.clone(), row);
+                } else {
+                    self.auto_list_box.append(&row);
+                    self.auto_rows.insert(game.id.clone(), row);
+                }
                 self.games.push(game);
+                self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
             }
             Controls::RemoveGame(id) => {
-                if let Some(row) = self.rows.remove(&id) {
-                    self.list_box.remove(&row);
+                if let Some(row) = self.manual_rows.remove(&id) {
+                    self.manual_list_box.remove(&row);
+                } else if let Some(row) = self.auto_rows.remove(&id) {
+                    self.auto_list_box.remove(&row);
                 }
                 self.games.retain(|g| g.id != id);
+                self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
             }
         }
     }
@@ -113,7 +176,7 @@ impl SimpleComponent for GameList {
 
 /// Builds an [`adw::ActionRow`] card for a single game.
 ///
-/// Manual games get a trash button; Steam-discovered games get only the chevron.
+/// Manual games get a trash button; auto-detected games get only the chevron.
 fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> adw::ActionRow {
     let row = adw::ActionRow::new();
     row.set_widget_name(&game.id);
