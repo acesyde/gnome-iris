@@ -66,8 +66,6 @@ pub enum Controls {
     SetConfig(GlobalConfig),
     /// User toggled the merge-shaders switch.
     MergeShadersChanged(bool),
-    /// User toggled the global-INI switch.
-    GlobalIniChanged(bool),
     /// User changed the update-interval spin row.
     UpdateIntervalChanged(f64),
     /// The latest available version was fetched from GitHub.
@@ -127,14 +125,6 @@ impl SimpleComponent for Preferences {
                             set_subtitle: "Combine all repos into a single directory",
                             #[watch]
                             set_active: model.config.merge_shaders,
-                        },
-
-                        #[name(ini_row)]
-                        adw::SwitchRow {
-                            set_title: "Global ReShade.ini",
-                            set_subtitle: "Share one config file across all games",
-                            #[watch]
-                            set_active: model.config.global_ini,
                         },
                     },
                 },
@@ -203,10 +193,6 @@ impl SimpleComponent for Preferences {
         widgets.merge_row.connect_active_notify({
             let s = sender.clone();
             move |row| s.input(Controls::MergeShadersChanged(row.is_active()))
-        });
-        widgets.ini_row.connect_active_notify({
-            let s = sender.clone();
-            move |row| s.input(Controls::GlobalIniChanged(row.is_active()))
         });
         widgets.spin_row.connect_value_notify({
             let s = sender.clone();
@@ -287,12 +273,6 @@ impl SimpleComponent for Preferences {
             Controls::MergeShadersChanged(val) => {
                 if self.config.merge_shaders != val {
                     self.config.merge_shaders = val;
-                    sender.output(Signal::ConfigChanged(self.config.clone())).ok();
-                }
-            }
-            Controls::GlobalIniChanged(val) => {
-                if self.config.global_ini != val {
-                    self.config.global_ini = val;
                     sender.output(Signal::ConfigChanged(self.config.clone())).ok();
                 }
             }

@@ -7,8 +7,6 @@ use serde::{Deserialize, Serialize};
 pub struct GlobalConfig {
     /// Ordered list of shader repositories.
     pub shader_repos: Vec<ShaderRepo>,
-    /// When true, a shared `ReShade.ini` is used for all games.
-    pub global_ini: bool,
     /// When true, shaders from all repos are merged into a single `Merged/` directory.
     pub merge_shaders: bool,
     /// How many hours between automatic update checks.
@@ -19,7 +17,6 @@ impl Default for GlobalConfig {
     fn default() -> Self {
         Self {
             shader_repos: default_shader_repos(),
-            global_ini: true,
             merge_shaders: true,
             update_interval_hours: 4,
         }
@@ -93,7 +90,6 @@ mod tests {
                 branch: Some("slim".into()),
                 enabled_by_default: true,
             }],
-            global_ini: true,
             merge_shaders: true,
             update_interval_hours: 4,
         }
@@ -107,7 +103,6 @@ mod tests {
         assert_eq!(decoded.shader_repos.len(), 1);
         assert_eq!(decoded.shader_repos[0].local_name, "reshade-shaders");
         assert_eq!(decoded.update_interval_hours, 4);
-        assert!(decoded.global_ini);
         assert!(decoded.merge_shaders);
     }
 
