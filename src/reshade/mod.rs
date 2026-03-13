@@ -6,6 +6,7 @@ pub mod app_state;
 pub mod cache;
 pub mod catalog;
 pub mod config;
+pub mod d3dcompiler;
 pub mod game;
 pub mod install;
 pub mod reshade;

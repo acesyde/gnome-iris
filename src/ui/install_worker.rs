@@ -2,11 +2,12 @@
 
 use std::path::PathBuf;
 
+use anyhow::Context as _;
 use relm4::{ComponentSender, Worker};
 
 use crate::reshade::cache::UpdateCache;
 use crate::reshade::game::{DllOverride, ExeArch};
-use crate::reshade::{install, reshade};
+use crate::reshade::{d3dcompiler, install, reshade};
 
 /// Input commands for the install worker.
 #[derive(Debug)]
@@ -178,6 +179,13 @@ async fn do_install(
         let url = reshade::download_url(&version, false);
         reshade::download_and_extract(&url, &version_dir).await?;
     }
+
+    if !d3dcompiler::is_installed(data_dir, arch) {
+        sender
+            .output(Signal::Progress("Installing d3dcompiler_47.dll...".into()))
+            .ok();
+    }
+    d3dcompiler::ensure(data_dir, arch).context("Failed to install d3dcompiler_47.dll")?;
 
     sender
         .output(Signal::Progress("Installing...".into()))

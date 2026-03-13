@@ -1,8 +1,8 @@
-//! Build script: compiles icons, GResources, and GSettings schemas.
+//! Build script: compiles icons, `GResources`, and `GSettings` schemas.
 
 use std::process::{Command, exit};
 
-/// Output directory for compiled GSettings schemas.
+/// Output directory for compiled `GSettings` schemas.
 const SCHEMAS_DIR: &str = "./target/share/glib-2.0/schemas/";
 
 fn main() {

@@ -402,6 +402,7 @@ impl Component for Window {
                 use crate::reshade::cache::UpdateCache;
                 use crate::reshade::reshade::fetch_latest_version;
 
+                let d3dc_dir = cache_data_dir.clone();
                 let cache = UpdateCache::new(cache_data_dir);
                 let version = if cache.needs_update(update_interval) {
                     match fetch_latest_version().await {
@@ -424,6 +425,15 @@ impl Component for Window {
                 };
                 if let Some(v) = version {
                     sender_clone.input(Controls::LatestVersionFetched(v));
+                }
+
+                // Ensure both d3dcompiler DLLs are present in the data directory.
+                use crate::reshade::d3dcompiler;
+                use crate::reshade::game::ExeArch;
+                for arch in [ExeArch::X86, ExeArch::X86_64] {
+                    if let Err(e) = d3dcompiler::ensure(&d3dc_dir, arch) {
+                        log::warn!("Could not install d3dcompiler_47.dll: {e}");
+                    }
                 }
             });
         }
