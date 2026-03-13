@@ -4,10 +4,11 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use relm4::adw::prelude::*;
-use relm4::{ComponentParts, ComponentSender, SimpleComponent, adw, gtk};
+use relm4::{Component, ComponentController, ComponentParts, ComponentSender, Controller, SimpleComponent, adw, gtk};
 
 use crate::fl;
 use crate::reshade::config::GlobalConfig;
+use crate::ui::install_version_dialog;
 
 /// Initialization payload for [`Preferences`].
 pub struct PreferencesInit {
@@ -57,6 +58,8 @@ pub struct Preferences {
     placeholder_row: Option<adw::ActionRow>,
     /// In-flight operation keys — allows standard and addon downloads to run concurrently.
     active_ops: HashSet<String>,
+    /// Dialog for manually installing a specific version by number.
+    install_version_dialog: Controller<install_version_dialog::InstallVersionDialog>,
 }
 
 /// Input messages for [`Preferences`].
@@ -72,6 +75,8 @@ pub enum Controls {
     SetLatestVersion(String),
     /// User clicked the install button for the latest uninstalled version.
     InstallLatestVersion(String),
+    /// User clicked the "+" button to open the manual version install dialog.
+    OpenInstallVersionDialog,
     /// User clicked the remove button for an installed version.
     RemoveVersion(String),
     /// Worker completed the version download.
@@ -161,11 +166,22 @@ impl SimpleComponent for Preferences {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn init(
         init: PreferencesInit,
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        // Build the dialog component early so it can be stored in the model.
+        let install_version_dialog =
+            install_version_dialog::InstallVersionDialog::builder()
+                .launch(())
+                .forward(sender.input_sender(), |sig| match sig {
+                    install_version_dialog::Signal::InstallRequested(key) => {
+                        Controls::InstallLatestVersion(key)
+                    }
+                });
+
         let model = Self {
             data_dir: init.data_dir,
             config: init.config,
@@ -185,6 +201,7 @@ impl SimpleComponent for Preferences {
             versions_group: adw::PreferencesGroup::new(), // replaced below after view_output!
             placeholder_row: None,
             active_ops: HashSet::new(),
+            install_version_dialog,
         };
         let widgets = view_output!();
 
@@ -197,7 +214,7 @@ impl SimpleComponent for Preferences {
             move |row: &adw::SpinRow| s.input(Controls::UpdateIntervalChanged(row.value()))
         });
 
-        // Attach an "open folder" button to the versions group header.
+        // Attach action buttons to the versions group header.
         {
             let reshade_dir = model.data_dir.join("reshade");
             let open_btn = gtk::Button::from_icon_name("folder-open-symbolic");
@@ -211,7 +228,22 @@ impl SimpleComponent for Preferences {
                     .spawn()
                     .ok();
             });
-            widgets.versions_group.set_header_suffix(Some(&open_btn));
+
+            let add_version_btn = gtk::Button::from_icon_name("list-add-symbolic");
+            add_version_btn.set_valign(gtk::Align::Center);
+            add_version_btn.add_css_class("flat");
+            add_version_btn.set_tooltip_text(Some(&fl!("install-version-button-tooltip")));
+            {
+                let s = sender.clone();
+                add_version_btn.connect_clicked(move |_| {
+                    s.input(Controls::OpenInstallVersionDialog);
+                });
+            }
+
+            let header_box = gtk::Box::new(gtk::Orientation::Horizontal, 4);
+            header_box.append(&add_version_btn);
+            header_box.append(&open_btn);
+            widgets.versions_group.set_header_suffix(Some(&header_box));
         }
 
         // Populate installed versions rows imperatively (runtime data, can't use view! macro).
@@ -323,6 +355,18 @@ impl SimpleComponent for Preferences {
                     self.install_addon_spinner = Some(spinner);
                 }
             }
+            Controls::OpenInstallVersionDialog => {
+                self.install_version_dialog.emit(
+                    install_version_dialog::Controls::UpdateInstalledVersions(
+                        self.installed_versions.clone(),
+                    ),
+                );
+                self.install_version_dialog
+                    .emit(install_version_dialog::Controls::Reset);
+                if let Some(root) = self.versions_group.root() {
+                    self.install_version_dialog.widget().present(Some(&root));
+                }
+            }
             Controls::InstallLatestVersion(version_key) => {
                 if self.active_ops.contains(&version_key) {
                     return;
@@ -348,17 +392,27 @@ impl SimpleComponent for Preferences {
             Controls::VersionDownloadComplete(version_key) => {
                 let is_addon = version_key.ends_with("-Addon");
 
-                // Stop the correct install spinner and remove the correct uninstalled row.
+                // Stop the correct install spinner and remove the "latest not installed" row
+                // only if the version just downloaded IS the latest (custom installs must not
+                // disturb the uninstalled row for a different latest version).
                 if is_addon {
                     finish_install_op(&self.install_addon_button, &self.install_addon_spinner);
-                    if let Some(old) = self.latest_addon_uninstalled_row.take() {
+                    let is_latest_addon = self
+                        .latest_version
+                        .as_ref()
+                        .is_some_and(|l| format!("{l}-Addon") == version_key);
+                    if is_latest_addon
+                        && let Some(old) = self.latest_addon_uninstalled_row.take()
+                    {
                         self.versions_group.remove(&old);
                         self.install_addon_button = None;
                         self.install_addon_spinner = None;
                     }
                 } else {
                     finish_install_op(&self.install_button, &self.install_spinner);
-                    if let Some(old) = self.latest_uninstalled_row.take() {
+                    let is_latest =
+                        self.latest_version.as_deref() == Some(version_key.as_str());
+                    if is_latest && let Some(old) = self.latest_uninstalled_row.take() {
                         self.versions_group.remove(&old);
                         self.install_button = None;
                         self.install_spinner = None;
@@ -370,10 +424,15 @@ impl SimpleComponent for Preferences {
                     self.versions_group.remove(&ph);
                 }
 
+                let is_latest = self.latest_version.as_deref() == Some(version_key.as_str())
+                    || self
+                        .latest_version
+                        .as_ref()
+                        .is_some_and(|l| format!("{l}-Addon") == version_key);
                 let sub = subtitle_for_installed(
                     &version_key,
                     self.current_version.as_deref(),
-                    true,
+                    is_latest,
                 );
                 let is_in_use = self.versions_in_use.contains(&version_key);
                 let (row, btn, spinner) =
@@ -383,6 +442,11 @@ impl SimpleComponent for Preferences {
                 self.version_buttons.insert(version_key.clone(), btn);
                 self.version_spinners.insert(version_key.clone(), spinner);
                 self.installed_versions.push(version_key.clone());
+                self.install_version_dialog.emit(
+                    install_version_dialog::Controls::UpdateInstalledVersions(
+                        self.installed_versions.clone(),
+                    ),
+                );
                 self.active_ops.remove(&version_key);
             }
             Controls::VersionRemoveComplete(version) => {
@@ -393,18 +457,30 @@ impl SimpleComponent for Preferences {
                 self.version_buttons.remove(&version);
                 self.version_spinners.remove(&version);
                 self.installed_versions.retain(|v| v != &version);
+                self.install_version_dialog.emit(
+                    install_version_dialog::Controls::UpdateInstalledVersions(
+                        self.installed_versions.clone(),
+                    ),
+                );
 
-                // Restore the download row for the variant that was just removed.
+                // Restore the "latest not installed" row for the variant just removed,
+                // but only if the latest version is not already present in the installed list.
                 let is_addon = version.ends_with("-Addon");
                 if let Some(latest) = self.latest_version.clone() {
-                    if is_addon && self.latest_addon_uninstalled_row.is_none() {
+                    if is_addon
+                        && self.latest_addon_uninstalled_row.is_none()
+                        && !self.version_rows.contains_key(&format!("{latest}-Addon"))
+                    {
                         let addon_key = format!("{latest}-Addon");
                         let (row, btn, spinner) = build_uninstalled_row(&addon_key, &sender);
                         self.versions_group.add(&row);
                         self.latest_addon_uninstalled_row = Some(row);
                         self.install_addon_button = Some(btn);
                         self.install_addon_spinner = Some(spinner);
-                    } else if !is_addon && self.latest_uninstalled_row.is_none() {
+                    } else if !is_addon
+                        && self.latest_uninstalled_row.is_none()
+                        && !self.version_rows.contains_key(&latest)
+                    {
                         let (row, btn, spinner) = build_uninstalled_row(&latest, &sender);
                         self.versions_group.add(&row);
                         self.latest_uninstalled_row = Some(row);

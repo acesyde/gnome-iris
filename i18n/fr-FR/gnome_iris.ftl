@@ -65,6 +65,11 @@ version-status-current = actuelle
 version-status-latest = dernière
 version-in-use = Utilisée par un jeu — désinstallez d'abord
 remove-version = Supprimer la version
+install-version-button-tooltip = Installer une version spécifique
+install-version-dialog-title = Installer une version de ReShade
+install-version-entry-title = Version (ex. 6.3.0)
+install-version-install-btn = Installer
+install-version-already-installed = Cette version est déjà installée.
 
 # Add shader repo dialog
 dialog-name = Nom
