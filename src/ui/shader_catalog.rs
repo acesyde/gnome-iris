@@ -87,20 +87,17 @@ impl SimpleComponent for ShaderCatalog {
             set_hscrollbar_policy: gtk::PolicyType::Never,
 
             adw::PreferencesPage {
-                set_title: "Shaders",
+                set_title: &fl!("shaders-section"),
 
                 #[name(catalog_group)]
                 adw::PreferencesGroup {
-                    set_title: "Shaders",
-                    set_description: Some(
-                        "Download shader packs to the global cache. \
-                         Use the game detail pane to enable them per game."
-                    ),
+                    set_title: &fl!("shaders-section"),
+                    set_description: Some(&fl!("shaders-description")),
                 },
 
                 #[name(custom_group)]
                 adw::PreferencesGroup {
-                    set_title: "Custom",
+                    set_title: &fl!("custom-repos"),
                 },
             },
         }
@@ -146,14 +143,14 @@ impl SimpleComponent for ShaderCatalog {
             row.set_subtitle(entry.description);
 
             let (icon, tip) = if model.installed.contains(entry.local_name) {
-                ("view-refresh-symbolic", "Re-download")
+                ("view-refresh-symbolic", fl!("redownload"))
             } else {
-                ("folder-download-symbolic", "Download")
+                ("folder-download-symbolic", fl!("download"))
             };
             let btn = gtk::Button::from_icon_name(icon);
             btn.set_valign(gtk::Align::Center);
             btn.add_css_class("flat");
-            btn.set_tooltip_text(Some(tip));
+            btn.set_tooltip_text(Some(&tip));
             {
                 let s = sender.clone();
                 btn.connect_clicked(move |_| s.input(Controls::DownloadRepo(entry)));
@@ -344,7 +341,7 @@ fn finish_sync(
         btn.set_sensitive(true);
         if success {
             btn.set_icon_name("view-refresh-symbolic");
-            btn.set_tooltip_text(Some("Re-download"));
+            btn.set_tooltip_text(Some(&fl!("redownload")));
         }
         if let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok()) {
             stack.set_visible_child_name("button");
@@ -370,14 +367,14 @@ fn build_custom_row(
 
     // Download button — shows refresh icon when already installed.
     let (icon, tip) = if is_installed {
-        ("view-refresh-symbolic", "Re-download")
+        ("view-refresh-symbolic", fl!("redownload"))
     } else {
-        ("folder-download-symbolic", "Download")
+        ("folder-download-symbolic", fl!("download"))
     };
     let dl_btn = gtk::Button::from_icon_name(icon);
     dl_btn.set_valign(gtk::Align::Center);
     dl_btn.add_css_class("flat");
-    dl_btn.set_tooltip_text(Some(tip));
+    dl_btn.set_tooltip_text(Some(&tip));
     {
         let s = sender.clone();
         let repo_clone = repo.clone();
@@ -402,7 +399,7 @@ fn build_custom_row(
     rm_btn.set_valign(gtk::Align::Center);
     rm_btn.add_css_class("flat");
     rm_btn.add_css_class("destructive-action");
-    rm_btn.set_tooltip_text(Some("Remove"));
+    rm_btn.set_tooltip_text(Some(&fl!("remove")));
     {
         let s = sender.clone();
         let repo_clone = repo.clone();

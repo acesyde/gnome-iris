@@ -66,23 +66,23 @@ impl SimpleComponent for AddShaderRepoDialog {
                     adw::PreferencesGroup {
                         #[name(name_entry)]
                         adw::EntryRow {
-                            set_title: "Name",
+                            set_title: &fl!("dialog-name"),
                         },
 
                         #[name(url_entry)]
                         adw::EntryRow {
-                            set_title: "URL",
+                            set_title: &fl!("dialog-url"),
                         },
 
                         #[name(ref_entry)]
                         adw::EntryRow {
-                            set_title: "Branch / Tag (optional)",
+                            set_title: &fl!("dialog-branch-tag"),
                         },
                     },
 
                     #[name(confirm_btn)]
                     gtk::Button {
-                        set_label: "Add",
+                        set_label: &fl!("dialog-add"),
                         add_css_class: "suggested-action",
                         #[watch]
                         set_sensitive: !model.name.is_empty() && !model.url.is_empty(),

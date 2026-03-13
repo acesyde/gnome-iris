@@ -110,19 +110,17 @@ impl SimpleComponent for Preferences {
                 set_spacing: 0,
 
                 adw::PreferencesPage {
-                    set_title: "Shaders",
+                    set_title: &fl!("shaders-section"),
                     set_icon_name: Some("preferences-system-symbolic"),
 
                     adw::PreferencesGroup {
-                        set_title: "Shader Repositories",
-                        set_description: Some(
-                            "Repos are cloned in order; first match wins on name collision.",
-                        ),
+                        set_title: &fl!("shader-repositories"),
+                        set_description: Some(&fl!("shader-repos-description")),
 
                         #[name(merge_row)]
                         adw::SwitchRow {
-                            set_title: "Merge shaders",
-                            set_subtitle: "Combine all repos into a single directory",
+                            set_title: &fl!("merge-shaders"),
+                            set_subtitle: &fl!("merge-shaders-subtitle"),
                             #[watch]
                             set_active: model.config.merge_shaders,
                         },
@@ -130,16 +128,16 @@ impl SimpleComponent for Preferences {
                 },
 
                 adw::PreferencesPage {
-                    set_title: "Updates",
+                    set_title: &fl!("updates"),
                     set_icon_name: Some("software-update-available-symbolic"),
 
                     adw::PreferencesGroup {
-                        set_title: "Update Check",
+                        set_title: &fl!("update-check"),
 
                         #[name(spin_row)]
                         adw::SpinRow {
-                            set_title: "Check interval (hours)",
-                            set_subtitle: "How often to check for a new ReShade release",
+                            set_title: &fl!("update-interval"),
+                            set_subtitle: &fl!("update-interval-subtitle"),
                             set_adjustment: Some(&gtk::Adjustment::new(4.0, 1.0, 168.0, 1.0, 0.0, 0.0)),
                             set_digits: 0,
                             set_snap_to_ticks: true,
@@ -155,8 +153,8 @@ impl SimpleComponent for Preferences {
 
                     #[name(versions_group)]
                     adw::PreferencesGroup {
-                        set_title: "Installed Versions",
-                        set_description: Some("Versions downloaded to the local cache."),
+                        set_title: &fl!("installed-versions"),
+                        set_description: Some(&fl!("installed-versions-description")),
                     },
                 },
             },
@@ -220,8 +218,8 @@ impl SimpleComponent for Preferences {
         let (version_rows, version_buttons, version_spinners, placeholder_row) =
             if model.installed_versions.is_empty() {
                 let row = adw::ActionRow::new();
-                row.set_title("No versions installed");
-                row.set_subtitle("Install ReShade from the game detail pane");
+                row.set_title(&fl!("no-versions-installed"));
+                row.set_subtitle(&fl!("no-versions-subtitle"));
                 widgets.versions_group.add(&row);
                 (HashMap::new(), HashMap::new(), HashMap::new(), Some(row))
             } else {
@@ -416,8 +414,8 @@ impl SimpleComponent for Preferences {
                 } else if self.version_rows.is_empty() {
                     // Latest version unknown and nothing left — show placeholder.
                     let ph = adw::ActionRow::new();
-                    ph.set_title("No versions installed");
-                    ph.set_subtitle("Install ReShade from the game detail pane");
+                    ph.set_title(&fl!("no-versions-installed"));
+                    ph.set_subtitle(&fl!("no-versions-subtitle"));
                     self.versions_group.add(&ph);
                     self.placeholder_row = Some(ph);
                 }
@@ -440,7 +438,7 @@ impl SimpleComponent for Preferences {
 /// Format a version key for display: `"6.7.3-Addon"` → `"6.7.3 — Addon Support"`.
 fn display_title(version_key: &str) -> String {
     if let Some(base) = version_key.strip_suffix("-Addon") {
-        format!("{base} — Addon Support")
+        format!("{base} — {}", fl!("addon-support"))
     } else {
         version_key.to_owned()
     }
@@ -453,12 +451,12 @@ fn build_uninstalled_row(
 ) -> (adw::ActionRow, gtk::Button, gtk::Spinner) {
     let row = adw::ActionRow::new();
     row.set_title(&display_title(version_key));
-    row.set_subtitle("latest available — not installed");
+    row.set_subtitle(&fl!("latest-not-installed"));
 
     let btn = gtk::Button::from_icon_name("folder-download-symbolic");
     btn.set_valign(gtk::Align::Center);
     btn.add_css_class("flat");
-    btn.set_tooltip_text(Some("Download to cache"));
+    btn.set_tooltip_text(Some(&fl!("download-to-cache")));
     {
         let vk = version_key.to_owned();
         let s = sender.clone();
@@ -482,9 +480,9 @@ fn build_uninstalled_row(
 /// Compute the subtitle for an installed version row.
 fn subtitle_for_installed(version: &str, current: Option<&str>, is_latest: bool) -> String {
     match (current == Some(version), is_latest) {
-        (true, true) => "current · latest".to_owned(),
-        (true, false) => "current".to_owned(),
-        (false, true) => "latest".to_owned(),
+        (true, true) => fl!("version-status-current-latest"),
+        (true, false) => fl!("version-status-current"),
+        (false, true) => fl!("version-status-latest"),
         (false, false) => String::new(),
     }
 }
@@ -508,11 +506,12 @@ fn build_installed_row(
     btn.set_valign(gtk::Align::Center);
     btn.add_css_class("flat");
     btn.set_sensitive(!is_in_use);
-    btn.set_tooltip_text(Some(if is_in_use {
-        "In use by a game — uninstall first"
+    let tip = if is_in_use {
+        fl!("version-in-use")
     } else {
-        "Remove version"
-    }));
+        fl!("remove-version")
+    };
+    btn.set_tooltip_text(Some(&tip));
     {
         let v = version.to_owned();
         let s = sender.clone();

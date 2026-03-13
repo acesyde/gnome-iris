@@ -4,6 +4,7 @@ use relm4::adw;
 use relm4::adw::prelude::*;
 use relm4::ComponentController;
 
+use crate::fl;
 use crate::reshade::config::ShaderRepo;
 use crate::ui::{shader_catalog, shader_worker};
 
@@ -78,7 +79,7 @@ pub(super) fn handle_repo_added(model: &mut Window, repo: ShaderRepo) {
         .any(|e| e.url == repo.url || e.local_name == repo.local_name);
     if in_catalog {
         model.toast_overlay.add_toast(adw::Toast::new(
-            "This repository is already in the known catalog.",
+            &fl!("toast-repo-in-catalog"),
         ));
         return;
     }
@@ -91,7 +92,7 @@ pub(super) fn handle_repo_added(model: &mut Window, repo: ShaderRepo) {
     if already {
         model
             .toast_overlay
-            .add_toast(adw::Toast::new("This repository has already been added."));
+            .add_toast(adw::Toast::new(&fl!("toast-repo-duplicate")));
         return;
     }
     model.app_state.config.shader_repos.push(repo.clone());

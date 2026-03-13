@@ -76,7 +76,7 @@ impl SimpleComponent for GameList {
                     gtk::Label {
                         add_css_class: "heading",
                         set_halign: gtk::Align::Start,
-                        set_label: "Autodetected",
+                        set_label: &fl!("autodetected"),
                     },
 
                     #[name(auto_list_box)]
@@ -97,7 +97,7 @@ impl SimpleComponent for GameList {
                     gtk::Label {
                         add_css_class: "heading",
                         set_halign: gtk::Align::Start,
-                        set_label: "Manually added",
+                        set_label: &fl!("manually-added"),
                     },
 
                     #[name(manual_list_box)]
@@ -179,7 +179,7 @@ impl SimpleComponent for GameList {
             }
             Controls::SetGameStatus { id, installed } => {
                 let subtitle = if installed {
-                    String::from("ReShade installed")
+                    fl!("reshade-installed")
                 } else {
                     fl!("not-installed")
                 };
@@ -215,7 +215,7 @@ fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> adw::Actio
         let btn = gtk::Button::from_icon_name("user-trash-symbolic");
         btn.set_valign(gtk::Align::Center);
         btn.add_css_class("flat");
-        btn.set_tooltip_text(Some("Remove game"));
+        btn.set_tooltip_text(Some(&fl!("remove-game")));
         let id = game.id.clone();
         let s = sender.clone();
         btn.connect_clicked(move |_| {

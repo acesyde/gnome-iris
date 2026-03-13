@@ -255,7 +255,7 @@ impl SimpleComponent for GameDetail {
                                 gtk::Button {
                                     set_icon_name: "folder-open-symbolic",
                                     add_css_class: "flat",
-                                    set_tooltip_text: Some("Open game folder"),
+                                    set_tooltip_text: Some(&fl!("open-game-folder")),
                                     set_valign: gtk::Align::Center,
                                     #[watch]
                                     set_visible: model.game.is_some(),
