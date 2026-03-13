@@ -5,7 +5,7 @@ use relm4::ComponentController;
 
 use crate::reshade::cache::UpdateCache;
 use crate::reshade::config::GlobalConfig;
-use crate::ui::{install_worker, preferences};
+use crate::ui::{game_detail, install_worker, preferences};
 
 use super::Window;
 
@@ -40,8 +40,16 @@ pub(super) fn handle_version_download_requested(model: &mut Window, version_key:
         });
 }
 
-/// Notify Preferences that a version download completed.
+/// Notify Preferences that a version download completed; also sync Window's version list.
 pub(super) fn handle_version_download_complete(model: &mut Window, version: String) {
+    model.installed_versions.push(version.clone());
+    if model.current_game_id.is_some() {
+        model
+            .game_detail
+            .emit(game_detail::Controls::SetInstalledVersions(
+                model.installed_versions.clone(),
+            ));
+    }
     model
         .preferences
         .emit(preferences::Controls::VersionDownloadComplete(version));
@@ -77,5 +85,14 @@ pub(super) fn handle_version_remove_requested(model: &mut Window, version: Strin
     }
     model
         .preferences
-        .emit(preferences::Controls::VersionRemoveComplete(version));
+        .emit(preferences::Controls::VersionRemoveComplete(version.clone()));
+    // Sync Window's version list and refresh the detail pane if open.
+    model.installed_versions.retain(|v| v != &version);
+    if model.current_game_id.is_some() {
+        model
+            .game_detail
+            .emit(game_detail::Controls::SetInstalledVersions(
+                model.installed_versions.clone(),
+            ));
+    }
 }
