@@ -88,12 +88,76 @@ fn parse_appmanifest(acf_path: &Path, steamapps: &Path) -> Option<Game> {
         return None;
     }
 
-    let path = steamapps.join("common").join(&install_dir);
-    if !path.exists() {
+    let base = steamapps.join("common").join(&install_dir);
+    if !base.exists() {
         return None;
     }
+    let path = find_exe_dir(&base);
 
     Some(Game::new(name, path, GameSource::Steam { app_id }))
+}
+
+/// Returns the directory where ReShade DLLs should be placed for a game.
+///
+/// Many games ship their main executable in an architecture-named subdirectory
+/// (e.g. `bin/win_x64`, `bin/x64`, `Binaries/Win64`). This function detects
+/// that layout and returns the subdirectory; otherwise it returns `base` unchanged.
+fn find_exe_dir(base: &Path) -> PathBuf {
+    // Path components that indicate an architecture-specific exe subdirectory.
+    const ARCH_HINTS: &[&str] = &[
+        "win_x64", "win_x86", "win64", "win32", "winx64", "winx86", "x64", "x86_64", "x86",
+        "binaries",
+    ];
+
+    // Walk up to 4 levels deep and collect (parent_dir, exe_size) pairs for
+    // every .exe whose relative path contains an architecture hint component.
+    let candidates: Vec<(PathBuf, u64)> = walk_exes(base, 4)
+        .into_iter()
+        .filter_map(|exe| {
+            let rel = exe.strip_prefix(base).ok()?;
+            let has_hint = rel.components().any(|c| {
+                let s = c.as_os_str().to_ascii_lowercase();
+                ARCH_HINTS.iter().any(|h| s == *h)
+            });
+            if has_hint {
+                let size = std::fs::metadata(&exe).map(|m| m.len()).unwrap_or(0);
+                Some((exe.parent()?.to_path_buf(), size))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Pick the directory containing the largest arch-hinted exe (largest = main binary).
+    candidates
+        .into_iter()
+        .max_by_key(|(_, size)| *size)
+        .map(|(dir, _)| dir)
+        .unwrap_or_else(|| base.to_path_buf())
+}
+
+/// Recursively collects `.exe` paths under `dir`, limited to `max_depth` levels.
+fn walk_exes(dir: &Path, max_depth: usize) -> Vec<PathBuf> {
+    if max_depth == 0 {
+        return vec![];
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return vec![];
+    };
+    let mut exes = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            exes.extend(walk_exes(&path, max_depth - 1));
+        } else if path
+            .extension()
+            .map(|e| e.eq_ignore_ascii_case("exe"))
+            .unwrap_or(false)
+        {
+            exes.push(path);
+        }
+    }
+    exes
 }
 
 /// Returns `true` if the name/installdir matches known Steam tool patterns
@@ -219,6 +283,35 @@ mod tests {
         let path = dir.path().join("test.exe");
         std::fs::write(&path, &buf).unwrap();
         assert_eq!(detect_exe_arch(&path), Some(ExeArch::X86));
+    }
+
+    #[test]
+    fn find_exe_dir_prefers_arch_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        // Root-level launcher (no arch hint)
+        std::fs::write(base.join("Launcher.exe"), b"small").unwrap();
+        // Architecture-hinted subdirectory with the real binary
+        let bin = base.join("bin").join("win_x64");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::write(bin.join("GameMain.exe"), b"a large binary content here").unwrap();
+
+        assert_eq!(find_exe_dir(base), bin);
+    }
+
+    #[test]
+    fn find_exe_dir_falls_back_to_base_when_no_arch_hint() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        std::fs::write(base.join("Game.exe"), b"binary").unwrap();
+
+        assert_eq!(find_exe_dir(base), base);
+    }
+
+    #[test]
+    fn find_exe_dir_returns_base_for_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(find_exe_dir(dir.path()), dir.path());
     }
 
     #[test]
