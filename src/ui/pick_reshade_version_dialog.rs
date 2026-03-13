@@ -7,8 +7,6 @@ use crate::fl;
 
 /// Model for the version-picker dialog.
 pub struct PickReshadeVersionDialog {
-    /// Version keys currently shown in the list (populated on `Open`).
-    versions: Vec<String>,
     /// The version key currently selected by the user.
     selected: Option<String>,
     /// Stored ref so we can call `close()` from `update()`.
@@ -121,7 +119,6 @@ impl SimpleComponent for PickReshadeVersionDialog {
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let mut model = Self {
-            versions: Vec::new(),
             selected: None,
             dialog: adw::Dialog::new(),
             list_box: gtk::ListBox::new(),
@@ -152,7 +149,6 @@ impl SimpleComponent for PickReshadeVersionDialog {
                 }
                 // 2. Reset selection.
                 self.selected = None;
-                self.versions = versions.clone();
                 // 3. Guard: empty list should not happen (Install button is disabled
                 //    in GameDetail when no versions exist), but be defensive.
                 if versions.is_empty() {
