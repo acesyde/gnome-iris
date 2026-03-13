@@ -8,6 +8,7 @@ pub mod game_list;
 pub mod game_shader_overrides;
 pub mod install_version_dialog;
 pub mod install_worker;
+pub mod pick_reshade_version_dialog;
 pub mod preferences;
 pub mod shader_catalog;
 pub mod shader_worker;
