@@ -44,17 +44,21 @@ pub(super) fn handle_game_selected(model: &mut Window, id: String) {
             overrides: game.shader_overrides,
             reshade_version: model.app_state.reshade_version.clone(),
         });
+        model.game_detail.emit(
+            game_detail::Controls::SetInstalledVersions(model.installed_versions.clone()),
+        );
         model.nav_view.push(model.game_detail.widget());
         model.current_game_id = Some(id);
     }
 }
 
-/// Dispatch an install job to the worker.
+/// Dispatch an install job to the worker using the pre-cached version.
 pub(super) fn handle_install(
     model: &mut Window,
     game_id: String,
     dll: DllOverride,
     arch: ExeArch,
+    version: String,
 ) {
     if let Some(game) = model.games.iter().find(|g| g.id == game_id) {
         let data_dir = iris_data_dir();
@@ -63,6 +67,7 @@ pub(super) fn handle_install(
             game_dir: game.path.clone(),
             dll,
             arch,
+            version,
         });
         model.pending_install = Some((dll, arch));
     }
