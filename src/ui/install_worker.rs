@@ -12,7 +12,7 @@ use crate::reshade::{d3dcompiler, install, reshade};
 /// Input commands for the install worker.
 #[derive(Debug)]
 pub enum Controls {
-    /// Download the latest ReShade and install into the given game directory.
+    /// Install a pre-cached ReShade version into the given game directory.
     Install {
         /// App data directory.
         data_dir: PathBuf,
@@ -22,6 +22,8 @@ pub enum Controls {
         dll: DllOverride,
         /// Executable architecture.
         arch: ExeArch,
+        /// The cached version key to install, e.g. `"v6.3.0"` or `"v6.3.0-Addon"`.
+        version: String,
     },
     /// Remove ReShade from the given game directory.
     Uninstall {
@@ -84,11 +86,12 @@ impl Worker for InstallWorker {
                 game_dir,
                 dll,
                 arch,
+                version,
             } => {
                 let sender2 = sender.clone();
                 relm4::spawn(async move {
                     if let Err(e) =
-                        do_install(&data_dir, &game_dir, dll, arch, &sender2).await
+                        do_install(&data_dir, &game_dir, dll, arch, &version, &sender2).await
                     {
                         sender2.output(Signal::Error(e.to_string())).ok();
                     }
@@ -160,24 +163,14 @@ async fn do_install(
     game_dir: &std::path::Path,
     dll: DllOverride,
     arch: ExeArch,
+    version: &str,
     sender: &ComponentSender<InstallWorker>,
 ) -> anyhow::Result<()> {
-    sender
-        .output(Signal::Progress(
-            "Fetching latest ReShade version...".into(),
-        ))
-        .ok();
-    let version = reshade::fetch_latest_version().await?;
-
-    let version_dir = reshade::version_dir(data_dir, &version);
+    let version_dir = reshade::version_dir(data_dir, version);
     if !version_dir.join(arch.reshade_dll()).exists() {
-        sender
-            .output(Signal::Progress(format!(
-                "Downloading ReShade {version}..."
-            )))
-            .ok();
-        let url = reshade::download_url(&version, false);
-        reshade::download_and_extract(&url, &version_dir).await?;
+        anyhow::bail!(
+            "ReShade {version} is not cached locally — download it in Preferences first"
+        );
     }
 
     if !d3dcompiler::is_installed(data_dir, arch) {
@@ -187,18 +180,14 @@ async fn do_install(
     }
     d3dcompiler::ensure(data_dir, arch).context("Failed to install d3dcompiler_47.dll")?;
 
-    sender
-        .output(Signal::Progress("Installing...".into()))
-        .ok();
-    install::install_reshade(data_dir, game_dir, &version, dll, arch)?;
+    sender.output(Signal::Progress("Installing...".into())).ok();
+    install::install_reshade(data_dir, game_dir, version, dll, arch)?;
 
-    let cache = UpdateCache::new(data_dir.to_path_buf());
-    if let Err(e) = cache.add_installed(&version) {
-        log::warn!("Could not update installed versions cache: {e}");
-    }
+    // cache.add_installed intentionally omitted: the version is already
+    // registered in the cache from the Preferences download step.
 
     sender
-        .output(Signal::InstallComplete { version })
+        .output(Signal::InstallComplete { version: version.to_owned() })
         .ok();
     Ok(())
 }
