@@ -350,10 +350,11 @@ impl SimpleComponent for GameDetail {
             Controls::Clear => self.game = None,
             Controls::SetProgress(msg) => self.progress_message = Some(msg),
             Controls::ClearProgress => self.progress_message = None,
-            Controls::MarkInstalled { dll, arch, .. } => {
+            Controls::MarkInstalled { dll, arch, version } => {
                 if let Some(game) = &mut self.game {
                     game.status = InstallStatus::Installed { dll, arch };
                 }
+                self.reshade_version = Some(version);
             }
             Controls::MarkUninstalled => {
                 if let Some(game) = &mut self.game {
