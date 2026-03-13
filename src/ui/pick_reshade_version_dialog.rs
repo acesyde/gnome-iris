@@ -195,8 +195,8 @@ impl SimpleComponent for PickReshadeVersionDialog {
             Controls::Confirm => {
                 if let Some(version) = self.selected.take() {
                     sender.output(Signal::VersionChosen(version)).ok();
+                    self.dialog.close();
                 }
-                self.dialog.close();
             }
         }
     }
