@@ -14,6 +14,7 @@ use crate::fl;
 use crate::reshade::app_state::AppState;
 use crate::reshade::config::GlobalConfig;
 use crate::reshade::game::{Game, InstallStatus};
+use crate::reshade::install::detect_install_status;
 use crate::reshade::reshade::list_installed_versions;
 use crate::ui::add_game_dialog;
 use crate::ui::add_shader_repo_dialog;
@@ -159,8 +160,9 @@ impl Component for Window {
         let app_state = AppState::load();
         let mut games = app_state.games.clone();
         let steam_games = crate::reshade::steam::discover_steam_games();
-        for sg in steam_games {
+        for mut sg in steam_games {
             if !games.iter().any(|g| g.id == sg.id) {
+                sg.status = detect_install_status(&sg.path);
                 games.push(sg);
             }
         }

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
-use crate::reshade::game::{DllOverride, ExeArch};
+use crate::reshade::game::{DllOverride, ExeArch, InstallStatus};
 
 /// Installs ReShade into `game_dir` by creating symlinks.
 ///
@@ -77,6 +77,33 @@ pub fn default_dll_for_arch(arch: ExeArch) -> DllOverride {
         ExeArch::X86 => DllOverride::D3d9,
         ExeArch::X86_64 => DllOverride::Dxgi,
     }
+}
+
+/// Detects the current ReShade install status by inspecting symlinks in `game_dir`.
+///
+/// Scans for any known DLL override symlink. When found, reads the symlink
+/// target to determine architecture from the DLL name (`ReShade64` vs `ReShade32`).
+pub fn detect_install_status(game_dir: &Path) -> InstallStatus {
+    for &dll in DllOverride::all() {
+        let symlink = game_dir.join(dll.symlink_name());
+        if symlink.is_symlink() {
+            let arch = std::fs::read_link(&symlink)
+                .ok()
+                .and_then(|p| {
+                    let s = p.to_string_lossy().into_owned();
+                    if s.contains("ReShade64") {
+                        Some(ExeArch::X86_64)
+                    } else if s.contains("ReShade32") {
+                        Some(ExeArch::X86)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(ExeArch::X86_64);
+            return InstallStatus::Installed { dll, arch };
+        }
+    }
+    InstallStatus::NotInstalled
 }
 
 /// Returns all `.exe` files in `game_dir`.
@@ -153,6 +180,28 @@ mod tests {
     #[test]
     fn default_dll_for_arch_x86_64() {
         assert_eq!(default_dll_for_arch(ExeArch::X86_64), DllOverride::Dxgi);
+    }
+
+    #[test]
+    fn detect_install_status_finds_installed() {
+        let base = tempdir().unwrap();
+        let game_dir = tempdir().unwrap();
+        let arch = ExeArch::X86_64;
+        setup_fake_reshade(base.path(), "6.1.0", arch);
+        install_reshade(base.path(), game_dir.path(), "6.1.0", DllOverride::Dxgi, arch).unwrap();
+
+        let status = detect_install_status(game_dir.path());
+        assert!(matches!(
+            status,
+            InstallStatus::Installed { dll: DllOverride::Dxgi, arch: ExeArch::X86_64 }
+        ));
+    }
+
+    #[test]
+    fn detect_install_status_not_installed() {
+        let game_dir = tempdir().unwrap();
+        let status = detect_install_status(game_dir.path());
+        assert!(matches!(status, InstallStatus::NotInstalled));
     }
 
     #[test]

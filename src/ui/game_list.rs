@@ -33,6 +33,13 @@ pub enum Controls {
     AddGame(Game),
     /// Remove the row for the given game ID.
     RemoveGame(String),
+    /// Update the install-status subtitle for a game row.
+    SetGameStatus {
+        /// Stable game ID.
+        id: String,
+        /// Whether ReShade is now installed.
+        installed: bool,
+    },
 }
 
 /// Output signals from [`GameList`].
@@ -169,6 +176,18 @@ impl SimpleComponent for GameList {
                 }
                 self.games.retain(|g| g.id != id);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
+            }
+            Controls::SetGameStatus { id, installed } => {
+                let subtitle = if installed {
+                    String::from("ReShade installed")
+                } else {
+                    fl!("not-installed")
+                };
+                if let Some(row) =
+                    self.auto_rows.get(&id).or_else(|| self.manual_rows.get(&id))
+                {
+                    row.set_subtitle(&subtitle);
+                }
             }
         }
     }
