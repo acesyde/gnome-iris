@@ -8,7 +8,7 @@ use relm4::ComponentController;
 
 use crate::reshade::app_state::iris_data_dir;
 use crate::reshade::catalog::KNOWN_REPOS;
-use crate::reshade::game::{DllOverride, ExeArch, Game, GameSource};
+use crate::reshade::game::{DllOverride, ExeArch, Game, GameSource, InstallStatus};
 use crate::ui::{add_game_dialog, game_detail, game_list, install_worker};
 
 use super::Window;
@@ -101,6 +101,22 @@ pub(super) fn handle_install_complete(model: &mut Window, version: String) {
         dll,
         arch,
     });
+    if let Some(id) = &model.current_game_id {
+        let status = InstallStatus::Installed { dll, arch };
+        if let Some(game) = model.games.iter_mut().find(|g| &g.id == id) {
+            game.status = status.clone();
+        }
+        if let Some(game) = model.app_state.games.iter_mut().find(|g| &g.id == id) {
+            game.status = status;
+            if let Err(e) = model.app_state.save() {
+                log::error!("Failed to save game status after install: {e}");
+            }
+        }
+        model.game_list.emit(game_list::Controls::SetGameStatus {
+            id: id.clone(),
+            installed: true,
+        });
+    }
 }
 
 /// Clear progress and mark the game as uninstalled.
@@ -111,6 +127,21 @@ pub(super) fn handle_uninstall_complete(model: &mut Window) {
     model
         .game_detail
         .emit(game_detail::Controls::MarkUninstalled);
+    if let Some(id) = &model.current_game_id {
+        if let Some(game) = model.games.iter_mut().find(|g| &g.id == id) {
+            game.status = InstallStatus::NotInstalled;
+        }
+        if let Some(game) = model.app_state.games.iter_mut().find(|g| &g.id == id) {
+            game.status = InstallStatus::NotInstalled;
+            if let Err(e) = model.app_state.save() {
+                log::error!("Failed to save game status after uninstall: {e}");
+            }
+        }
+        model.game_list.emit(game_list::Controls::SetGameStatus {
+            id: id.clone(),
+            installed: false,
+        });
+    }
 }
 
 /// Log and surface a worker error in the detail pane.
@@ -137,14 +168,30 @@ pub(super) fn handle_game_remove(model: &mut Window, id: String) {
     model.game_list.emit(game_list::Controls::RemoveGame(id));
 }
 
-/// Log the shader toggle (backend persistence is not yet implemented).
+/// Persist a per-game shader repo toggle.
 pub(super) fn handle_shader_toggled(
-    _model: &mut Window,
+    model: &mut Window,
     game_id: String,
     repo_name: String,
     enabled: bool,
 ) {
-    log::info!("Shader toggle: game={game_id} repo={repo_name} enabled={enabled}");
+    let update = |overrides: &mut crate::reshade::config::ShaderOverrides| {
+        if enabled {
+            overrides.disabled_repos.retain(|r| r != &repo_name);
+        } else if !overrides.disabled_repos.contains(&repo_name) {
+            overrides.disabled_repos.push(repo_name.clone());
+        }
+    };
+
+    if let Some(game) = model.games.iter_mut().find(|g| g.id == game_id) {
+        update(&mut game.shader_overrides);
+    }
+    if let Some(game) = model.app_state.games.iter_mut().find(|g| g.id == game_id) {
+        update(&mut game.shader_overrides);
+        if let Err(e) = model.app_state.save() {
+            log::error!("Failed to save shader overrides: {e}");
+        }
+    }
 }
 
 /// Persist the new game and add it to the list.

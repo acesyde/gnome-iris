@@ -51,6 +51,8 @@ pub enum Controls {
     InstallRequested,
     /// Internal: uninstall button clicked — `update()` reads `self.game`.
     UninstallRequested,
+    /// Internal: open-folder button clicked — opens the game directory.
+    OpenFolderRequested,
     /// Internal: shader switch toggled — `update()` emits the output signal.
     ShaderToggled {
         /// Repository local name.
@@ -117,10 +119,17 @@ impl GameDetail {
         if self.game.is_none() {
             return;
         }
+        let disabled = self
+            .game
+            .as_ref()
+            .map(|g| g.shader_overrides.disabled_repos.clone())
+            .unwrap_or_default();
         for repo in &self.shader_repos {
             let row = adw::SwitchRow::new();
             row.set_title(&repo.local_name);
-            row.set_active(false);
+            // Set initial state before connecting the notify handler so no
+            // spurious ShaderToggled messages are emitted on load.
+            row.set_active(!disabled.contains(&repo.local_name));
             let s = sender.clone();
             let name = repo.local_name.clone();
             row.connect_active_notify(move |r| {
@@ -242,6 +251,18 @@ impl SimpleComponent for GameDetail {
                                         sender.input(Controls::UninstallRequested);
                                     },
                                 },
+
+                                gtk::Button {
+                                    set_icon_name: "folder-open-symbolic",
+                                    add_css_class: "flat",
+                                    set_tooltip_text: Some("Open game folder"),
+                                    set_valign: gtk::Align::Center,
+                                    #[watch]
+                                    set_visible: model.game.is_some(),
+                                    connect_clicked[sender] => move |_| {
+                                        sender.input(Controls::OpenFolderRequested);
+                                    },
+                                },
                             },
 
                             // Shaders section
@@ -346,6 +367,13 @@ impl SimpleComponent for GameDetail {
                             enabled,
                         })
                         .ok();
+                }
+            }
+            Controls::OpenFolderRequested => {
+                if let Some(game) = &self.game {
+                    let file = gtk::gio::File::for_path(&game.path);
+                    let launcher = gtk::FileLauncher::new(Some(&file));
+                    launcher.launch(gtk::Window::NONE, gtk::gio::Cancellable::NONE, |_| {});
                 }
             }
         }
