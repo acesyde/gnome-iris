@@ -55,6 +55,8 @@ pub struct Window {
     pending_install: Option<(crate::reshade::game::DllOverride, crate::reshade::game::ExeArch)>,
     /// ID of the game currently shown in the detail pane (for config refresh).
     current_game_id: Option<String>,
+    /// Locally-cached ReShade version keys; kept in sync with Preferences add/remove.
+    installed_versions: Vec<String>,
 }
 
 /// Input messages for [`Window`].
@@ -70,6 +72,8 @@ pub enum Controls {
         game_id: String,
         dll: crate::reshade::game::DllOverride,
         arch: crate::reshade::game::ExeArch,
+        /// The cached version key chosen by the user, e.g. `"v6.3.0"`.
+        version: String,
     },
     /// GameDetail requested uninstallation.
     Uninstall {
@@ -178,8 +182,8 @@ impl Component for Window {
         let game_detail = game_detail::GameDetail::builder()
             .launch(())
             .forward(sender.input_sender(), |sig| match sig {
-                game_detail::Signal::Install { game_id, dll, arch } => {
-                    Controls::Install { game_id, dll, arch }
+                game_detail::Signal::Install { game_id, dll, arch, version } => {
+                    Controls::Install { game_id, dll, arch, version }
                 }
                 game_detail::Signal::Uninstall { game_id, dll } => {
                     Controls::Uninstall { game_id, dll }
@@ -198,7 +202,7 @@ impl Component for Window {
         let preferences_init = preferences::PreferencesInit {
             data_dir: app_state.data_dir.clone(),
             config: app_state.config.clone(),
-            installed_versions,
+            installed_versions: installed_versions.clone(),
             current_version: app_state.reshade_version.clone(),
             versions_in_use,
         };
@@ -387,6 +391,7 @@ impl Component for Window {
             toast_overlay: toast_overlay.clone(),
             pending_install: None,
             current_game_id: None,
+            installed_versions,
         };
 
         let nav_view = &nav_view;
@@ -445,8 +450,8 @@ impl Component for Window {
         match msg {
             Controls::GameSelected(id) => panel_games::handle_game_selected(self, id),
             Controls::GameRemoveRequested(id) => panel_games::handle_game_remove(self, id),
-            Controls::Install { game_id, dll, arch } => {
-                panel_games::handle_install(self, game_id, dll, arch);
+            Controls::Install { game_id, dll, arch, version } => {
+                panel_games::handle_install(self, game_id, dll, arch, version);
             }
             Controls::Uninstall { game_id, dll } => {
                 panel_games::handle_uninstall(self, game_id, dll);
