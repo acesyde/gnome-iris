@@ -71,6 +71,12 @@ install-version-entry-title = Version (e.g. 6.3.0)
 install-version-install-btn = Install
 install-version-already-installed = This version is already installed.
 
+# Version picker dialog (game install)
+no-versions-banner = Install a ReShade version in Preferences before installing to a game.
+pick-version-dialog-title = Choose ReShade Version
+pick-version-install-btn = Install
+pick-version-cancel-btn = Cancel
+
 # Add shader repo dialog
 dialog-name = Name
 dialog-url = URL
