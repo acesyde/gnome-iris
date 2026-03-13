@@ -1,11 +1,12 @@
 //! Detail pane showing a single game's ReShade status and controls.
 
 use relm4::adw::prelude::*;
-use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk};
+use relm4::{Component, ComponentController, ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk};
 
 use crate::fl;
 use crate::reshade::config::{ShaderOverrides, ShaderRepo};
 use crate::reshade::game::{DllOverride, ExeArch, Game, InstallStatus};
+use crate::ui::pick_reshade_version_dialog;
 
 /// Game detail pane model.
 pub struct GameDetail {
@@ -14,6 +15,10 @@ pub struct GameDetail {
     shader_repos: Vec<ShaderRepo>,
     reshade_version: Option<String>,
     shader_list: gtk::ListBox,
+    /// Locally-cached ReShade version keys (e.g. `"v6.3.0"`), set by Window.
+    installed_versions: Vec<String>,
+    /// Dialog for picking which cached version to install.
+    pick_version_dialog: relm4::Controller<pick_reshade_version_dialog::PickReshadeVersionDialog>,
 }
 
 /// Input messages for [`GameDetail`].
@@ -53,6 +58,10 @@ pub enum Controls {
     UninstallRequested,
     /// Internal: open-folder button clicked — opens the game directory.
     OpenFolderRequested,
+    /// Refresh the list of locally-cached ReShade versions available for install.
+    SetInstalledVersions(Vec<String>),
+    /// Internal: version picker dialog confirmed a version choice.
+    VersionChosen(String),
     /// Internal: shader switch toggled — `update()` emits the output signal.
     ShaderToggled {
         /// Repository local name.
@@ -73,6 +82,8 @@ pub enum Signal {
         dll: DllOverride,
         /// Architecture detected/chosen.
         arch: ExeArch,
+        /// The cached version key to install, e.g. `"v6.3.0"`.
+        version: String,
     },
     /// User requested uninstallation.
     Uninstall {
@@ -216,6 +227,14 @@ impl SimpleComponent for GameDetail {
                                 set_revealed: model.progress_message.is_some(),
                             },
 
+                            // No-versions warning banner
+                            adw::Banner {
+                                #[watch]
+                                set_title: &fl!("no-versions-banner"),
+                                #[watch]
+                                set_revealed: model.game.is_some() && model.installed_versions.is_empty(),
+                            },
+
                             // Action buttons (centered, pill-shaped)
                             gtk::Box {
                                 set_orientation: gtk::Orientation::Horizontal,
@@ -232,6 +251,9 @@ impl SimpleComponent for GameDetail {
                                         .as_ref()
                                         .map(|g| !g.status.is_installed())
                                         .unwrap_or(true),
+                                    #[watch]
+                                    set_sensitive: !model.installed_versions.is_empty()
+                                        && model.game.as_ref().map(|g| !g.status.is_installed()).unwrap_or(true),
                                     connect_clicked[sender] => move |_| {
                                         sender.input(Controls::InstallRequested);
                                     },
@@ -296,12 +318,22 @@ impl SimpleComponent for GameDetail {
         _root: Self::Root,
         sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
+        let pick_version_dialog =
+            pick_reshade_version_dialog::PickReshadeVersionDialog::builder()
+                .launch(())
+                .forward(sender.input_sender(), |sig| match sig {
+                    pick_reshade_version_dialog::Signal::VersionChosen(v) => {
+                        Controls::VersionChosen(v)
+                    }
+                });
         let mut model = Self {
             game: None,
             progress_message: None,
             shader_repos: Vec::new(),
             reshade_version: None,
             shader_list: gtk::ListBox::new(),
+            installed_versions: Vec::new(),
+            pick_version_dialog,
         };
         let widgets = view_output!();
         // Replace the placeholder with the real widget from the view tree.
@@ -337,15 +369,35 @@ impl SimpleComponent for GameDetail {
                 self.rebuild_shader_rows(&sender);
             }
             Controls::InstallRequested => {
+                use relm4::gtk::prelude::WidgetExt;
+                if let Some(root) = self.shader_list.root() {
+                    self.pick_version_dialog.emit(
+                        pick_reshade_version_dialog::Controls::Open {
+                            versions: self.installed_versions.clone(),
+                            parent: root.upcast::<gtk::Widget>(),
+                        },
+                    );
+                }
+            }
+            Controls::SetInstalledVersions(versions) => {
+                self.installed_versions = versions;
+            }
+            Controls::VersionChosen(version) => {
                 if let Some(game) = &self.game {
                     let (dll, arch) = match &game.status {
                         InstallStatus::Installed { dll, arch } => (*dll, *arch),
-                        InstallStatus::NotInstalled => {
-                            (DllOverride::Dxgi, game.preferred_arch.unwrap_or(ExeArch::X86_64))
-                        }
+                        InstallStatus::NotInstalled => (
+                            DllOverride::Dxgi,
+                            game.preferred_arch.unwrap_or(ExeArch::X86_64),
+                        ),
                     };
                     sender
-                        .output(Signal::Install { game_id: game.id.clone(), dll, arch })
+                        .output(Signal::Install {
+                            game_id: game.id.clone(),
+                            dll,
+                            arch,
+                            version,
+                        })
                         .ok();
                 }
             }
