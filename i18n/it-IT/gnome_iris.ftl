@@ -22,6 +22,7 @@ autodetected = Rilevato automaticamente
 manually-added = Aggiunto manualmente
 reshade-installed = ReShade installato
 remove-game = Rimuovi gioco
+update-available = Update available
 
 # Shaders
 shaders-section = Shader
