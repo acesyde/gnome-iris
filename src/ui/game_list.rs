@@ -6,7 +6,7 @@ use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk};
 
 use crate::fl;
-use crate::reshade::game::{Game, GameSource};
+use crate::reshade::game::{Game, GameSource, InstallStatus};
 
 /// Game list model.
 pub struct GameList {
@@ -37,8 +37,8 @@ pub enum Controls {
     SetGameStatus {
         /// Stable game ID.
         id: String,
-        /// Whether `ReShade` is now installed.
-        installed: bool,
+        /// Installed version string, or `None` if `ReShade` is not installed.
+        version: Option<String>,
     },
 }
 
@@ -173,8 +173,12 @@ impl SimpleComponent for GameList {
                 self.games.retain(|g| g.id != id);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
             },
-            Controls::SetGameStatus { id, installed } => {
-                let subtitle = if installed { fl!("reshade-installed") } else { fl!("not-installed") };
+            Controls::SetGameStatus { id, version } => {
+                let subtitle = match &version {
+                    Some(v) if !v.is_empty() => format!("ReShade {v}"),
+                    Some(_) => fl!("reshade-installed"),
+                    None => fl!("not-installed"),
+                };
                 if let Some(row) = self.auto_rows.get(&id).or_else(|| self.manual_rows.get(&id)) {
                     row.set_subtitle(&subtitle);
                 }
@@ -190,7 +194,11 @@ fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> adw::Actio
     let row = adw::ActionRow::new();
     row.set_widget_name(&game.id);
     row.set_title(&game.name);
-    let subtitle = if game.status.is_installed() { String::from("ReShade installed") } else { fl!("not-installed") };
+    let subtitle = match &game.status {
+        InstallStatus::Installed { version: Some(v), .. } if !v.is_empty() => format!("ReShade {v}"),
+        InstallStatus::Installed { .. } => fl!("reshade-installed"),
+        InstallStatus::NotInstalled => fl!("not-installed"),
+    };
     row.set_subtitle(&subtitle);
     row.set_activatable(true);
 

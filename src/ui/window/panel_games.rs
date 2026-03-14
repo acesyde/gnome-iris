@@ -93,7 +93,7 @@ pub(super) fn handle_install_complete(model: &mut Window, version: String) {
         }
         model.game_list.emit(game_list::Controls::SetGameStatus {
             id: id.clone(),
-            installed: true,
+            version: Some(version.clone()),
         });
     }
 }
@@ -114,7 +114,7 @@ pub(super) fn handle_uninstall_complete(model: &mut Window) {
         }
         model.game_list.emit(game_list::Controls::SetGameStatus {
             id: id.clone(),
-            installed: false,
+            version: None,
         });
     }
 }
