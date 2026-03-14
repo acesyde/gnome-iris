@@ -22,6 +22,10 @@ pub struct GameList {
     auto_rows: HashMap<String, adw::ActionRow>,
     /// Row widgets for manually added games, keyed by game ID.
     manual_rows: HashMap<String, adw::ActionRow>,
+    /// Pill labels for auto-detected game rows, keyed by game ID.
+    auto_update_pills: HashMap<String, gtk::Label>,
+    /// Pill labels for manually added game rows, keyed by game ID.
+    manual_update_pills: HashMap<String, gtk::Label>,
 }
 
 /// Input messages for [`GameList`].
@@ -120,19 +124,23 @@ impl SimpleComponent for GameList {
             manual_list_box: gtk::ListBox::new(),
             auto_rows: HashMap::new(),
             manual_rows: HashMap::new(),
+            auto_update_pills: HashMap::new(),
+            manual_update_pills: HashMap::new(),
         };
         let widgets = view_output!();
         model.auto_list_box = widgets.auto_list_box.clone();
         model.manual_list_box = widgets.manual_list_box.clone();
 
         for game in &games {
-            let row = build_game_row(game, &sender);
+            let (row, pill) = build_game_row(game, &sender);
             if matches!(game.source, GameSource::Manual) {
                 widgets.manual_list_box.append(&row);
                 model.manual_rows.insert(game.id.clone(), row);
+                model.manual_update_pills.insert(game.id.clone(), pill);
             } else {
                 widgets.auto_list_box.append(&row);
                 model.auto_rows.insert(game.id.clone(), row);
+                model.auto_update_pills.insert(game.id.clone(), pill);
             }
         }
 
@@ -153,13 +161,15 @@ impl SimpleComponent for GameList {
         match msg {
             Controls::SetGames(games) => self.games = games,
             Controls::AddGame(game) => {
-                let row = build_game_row(&game, &sender);
+                let (row, pill) = build_game_row(&game, &sender);
                 if matches!(game.source, GameSource::Manual) {
                     self.manual_list_box.append(&row);
                     self.manual_rows.insert(game.id.clone(), row);
+                    self.manual_update_pills.insert(game.id.clone(), pill);
                 } else {
                     self.auto_list_box.append(&row);
                     self.auto_rows.insert(game.id.clone(), row);
+                    self.auto_update_pills.insert(game.id.clone(), pill);
                 }
                 self.games.push(game);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
@@ -167,8 +177,10 @@ impl SimpleComponent for GameList {
             Controls::RemoveGame(id) => {
                 if let Some(row) = self.manual_rows.remove(&id) {
                     self.manual_list_box.remove(&row);
+                    self.manual_update_pills.remove(&id);
                 } else if let Some(row) = self.auto_rows.remove(&id) {
                     self.auto_list_box.remove(&row);
+                    self.auto_update_pills.remove(&id);
                 }
                 self.games.retain(|g| g.id != id);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
@@ -190,7 +202,8 @@ impl SimpleComponent for GameList {
 /// Builds an [`adw::ActionRow`] card for a single game.
 ///
 /// Manual games get a trash button; auto-detected games get only the chevron.
-fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> adw::ActionRow {
+/// Returns the row and the (initially hidden) update-available pill label.
+fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> (adw::ActionRow, gtk::Label) {
     let row = adw::ActionRow::new();
     row.set_widget_name(&game.id);
     row.set_title(&game.name);
@@ -218,8 +231,14 @@ fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> adw::Actio
         row.add_suffix(&btn);
     }
 
+    let pill = gtk::Label::new(Some(&fl!("update-available")));
+    pill.add_css_class("pill");
+    pill.add_css_class("accent");
+    pill.set_visible(false);
+    row.add_suffix(&pill);
+
     let chevron = gtk::Image::from_icon_name("go-next-symbolic");
     row.add_suffix(&chevron);
 
-    row
+    (row, pill)
 }
