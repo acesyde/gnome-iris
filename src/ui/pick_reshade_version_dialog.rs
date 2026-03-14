@@ -188,6 +188,7 @@ impl SimpleComponent for PickReshadeVersionDialog {
                     let title = Self::display_title(key);
                     let row = adw::ActionRow::new();
                     row.set_title(&title);
+                    row.set_activatable_widget(Some(&check));
                     row.add_suffix(&check);
                     self.list_box.append(&row);
                 }
