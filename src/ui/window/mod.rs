@@ -477,7 +477,7 @@ impl Component for Window {
             },
             Controls::ShaderRepoAdded(repo) => panel_shaders::handle_repo_added(self, repo),
             Controls::LatestVersionFetched(version) => {
-                panel_preferences::handle_latest_version_fetched(self, version);
+                panel_preferences::handle_latest_version_fetched(self, &version);
             },
             Controls::VersionDownloadRequested(version_key) => {
                 panel_preferences::handle_version_download_requested(self, &version_key);

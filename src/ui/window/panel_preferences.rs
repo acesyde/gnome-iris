@@ -5,7 +5,8 @@ use relm4::adw;
 
 use crate::reshade::cache::UpdateCache;
 use crate::reshade::config::GlobalConfig;
-use crate::ui::{game_detail, install_worker, preferences};
+use crate::reshade::game::InstallStatus;
+use crate::ui::{game_detail, game_list, install_worker, preferences};
 
 use super::Window;
 
@@ -17,9 +18,31 @@ pub(super) fn handle_config_changed(model: &mut Window, config: GlobalConfig) {
     }
 }
 
-/// Forward the latest fetched `ReShade` version to Preferences.
-pub(super) fn handle_latest_version_fetched(model: &Window, version: String) {
-    model.preferences.emit(preferences::Controls::SetLatestVersion(version));
+/// Store the latest version, forward to Preferences, and refresh pill visibility on all installed games.
+pub(super) fn handle_latest_version_fetched(model: &mut Window, version: &str) {
+    let version_owned = version.to_string();
+    model.latest_version = Some(version_owned.clone());
+    model.preferences.emit(preferences::Controls::SetLatestVersion(version_owned.clone()));
+
+    // Collect before emitting to satisfy the borrow checker:
+    // iterating `model.games` (immutable) and calling `model.game_list.emit` (mutable)
+    // cannot happen in the same loop body on the same `&mut Window`.
+    let installed: Vec<(String, Option<String>)> = model
+        .games
+        .iter()
+        .filter_map(|g| match &g.status {
+            InstallStatus::Installed { version: v, .. } => Some((g.id.clone(), v.clone())),
+            InstallStatus::NotInstalled => None,
+        })
+        .collect();
+
+    for (id, installed_version) in installed {
+        model.game_list.emit(game_list::Controls::SetGameStatus {
+            id,
+            version: installed_version,
+            latest_version: Some(version_owned.clone()),
+        });
+    }
 }
 
 /// Dispatch a version download job to the install worker.
