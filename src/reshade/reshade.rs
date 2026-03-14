@@ -135,6 +135,20 @@ pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
     Ok(versions)
 }
 
+/// Returns `true` if `installed` is strictly older than `latest`.
+///
+/// Both strings may optionally carry a leading `v` (e.g. `"v6.3.0"` or `"6.3.0"`).
+/// Returns `false` if either string cannot be parsed as a semver version.
+#[must_use]
+pub fn is_version_outdated(installed: &str, latest: &str) -> bool {
+    use semver::Version;
+    let strip_v = |s: &str| s.strip_prefix('v').unwrap_or(s).to_owned();
+    match (Version::parse(&strip_v(installed)), Version::parse(&strip_v(latest))) {
+        (Ok(i), Ok(l)) => i < l,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,6 +193,37 @@ mod tests {
     fn list_versions_empty_when_dir_absent() {
         let dir = tempfile::tempdir().unwrap();
         assert!(list_installed_versions(dir.path()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn version_outdated_when_installed_is_older() {
+        assert!(is_version_outdated("6.3.0", "v6.7.3"));
+    }
+
+    #[test]
+    fn version_not_outdated_when_equal() {
+        assert!(!is_version_outdated("6.7.3", "v6.7.3"));
+    }
+
+    #[test]
+    fn version_not_outdated_when_newer() {
+        assert!(!is_version_outdated("6.8.0", "v6.7.3"));
+    }
+
+    #[test]
+    fn version_not_outdated_on_parse_failure() {
+        assert!(!is_version_outdated("unknown", "v6.7.3"));
+        assert!(!is_version_outdated("6.7.3", "unknown"));
+    }
+
+    #[test]
+    fn version_outdated_strips_v_prefix() {
+        // installed v-prefixed, latest bare
+        assert!(is_version_outdated("v6.3.0", "6.7.3"));
+        // both bare
+        assert!(is_version_outdated("6.3.0", "6.7.3"));
+        // both v-prefixed
+        assert!(is_version_outdated("v6.3.0", "v6.7.3"));
     }
 
     #[test]

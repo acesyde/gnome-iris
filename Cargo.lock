@@ -986,6 +986,7 @@ dependencies = [
  "relm4-icons-build",
  "reqwest",
  "rust-embed",
+ "semver",
  "serde",
  "serde_json",
  "sevenz-rust",

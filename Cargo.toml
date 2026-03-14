@@ -41,6 +41,7 @@ relm4-components = { git = "https://github.com/relm4/relm4", rev = "baa1c23ab35e
 relm4-icons = "0.10"
 
 rust-embed = "8"
+semver     = "1"
 serde      = { version = "1", features = ["serde_derive"] }
 serde_json = "1"
 sha2       = "0.10"
