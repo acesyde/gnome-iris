@@ -252,7 +252,13 @@ impl SimpleComponent for Preferences {
             let mut rows = HashMap::new();
             let mut buttons = HashMap::new();
             let mut spinners = HashMap::new();
-            for version in &model.installed_versions {
+            let mut sorted = model.installed_versions.clone();
+            sorted.sort_by(|a, b| {
+                let (ma, mia, pa, aa) = version_sort_key(a);
+                let (mb, mib, pb, ab) = version_sort_key(b);
+                (mb, mib, pb).cmp(&(ma, mia, pa)).then(aa.cmp(&ab))
+            });
+            for version in &sorted {
                 let sub = subtitle_for_installed(version, model.current_version.as_deref(), false);
                 let is_in_use = model.versions_in_use.contains(version);
                 let (row, btn, spinner) = build_installed_row(version, &sub, is_in_use, &sender);
@@ -400,11 +406,24 @@ impl SimpleComponent for Preferences {
                 let sub = subtitle_for_installed(&version_key, self.current_version.as_deref(), is_latest);
                 let is_in_use = self.versions_in_use.contains(&version_key);
                 let (row, btn, spinner) = build_installed_row(&version_key, &sub, is_in_use, &sender);
-                self.versions_group.add(&row);
                 self.version_rows.insert(version_key.clone(), row);
                 self.version_buttons.insert(version_key.clone(), btn);
                 self.version_spinners.insert(version_key.clone(), spinner);
                 self.installed_versions.push(version_key.clone());
+
+                // Re-add all installed rows in sorted order so the new entry appears correctly.
+                let mut sorted = self.installed_versions.clone();
+                sorted.sort_by(|a, b| {
+                    let (ma, mia, pa, aa) = version_sort_key(a);
+                    let (mb, mib, pb, ab) = version_sort_key(b);
+                    (mb, mib, pb).cmp(&(ma, mia, pa)).then(aa.cmp(&ab))
+                });
+                for v in &self.version_rows.keys().cloned().collect::<Vec<_>>() {
+                    self.versions_group.remove(self.version_rows.get(v).unwrap());
+                }
+                for v in &sorted {
+                    self.versions_group.add(self.version_rows.get(v).unwrap());
+                }
                 self.install_version_dialog
                     .emit(install_version_dialog::Controls::UpdateInstalledVersions(self.installed_versions.clone()));
                 self.active_ops.remove(&version_key);
@@ -466,6 +485,21 @@ impl SimpleComponent for Preferences {
             },
         }
     }
+}
+
+/// Parse a version key into a sortable tuple `(major, minor, patch, is_addon)`.
+///
+/// Used to sort versions newest-first, with the plain variant before the Addon
+/// variant when both share the same base version.
+fn version_sort_key(key: &str) -> (u64, u64, u64, bool) {
+    let base = key.strip_prefix('v').unwrap_or(key);
+    let is_addon = base.ends_with("-Addon");
+    let ver = base.strip_suffix("-Addon").unwrap_or(base);
+    let mut parts = ver.split('.').map(|p| p.parse::<u64>().unwrap_or(0));
+    let major = parts.next().unwrap_or(0);
+    let minor = parts.next().unwrap_or(0);
+    let patch = parts.next().unwrap_or(0);
+    (major, minor, patch, is_addon)
 }
 
 /// Format a version key for display: `"6.7.3-Addon"` → `"6.7.3 — Addon Support"`.

@@ -335,6 +335,7 @@ impl SimpleComponent for GameDetail {
         match msg {
             Controls::SetGame(game) => {
                 self.game = Some(game);
+                self.progress_message = None;
                 self.rebuild_shader_rows(&sender);
             },
             Controls::Clear => self.game = None,
