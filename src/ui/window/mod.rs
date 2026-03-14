@@ -452,7 +452,7 @@ impl Component for Window {
             },
             Controls::Progress(msg) => panel_games::handle_progress(self, msg),
             Controls::InstallComplete { version } => {
-                panel_games::handle_install_complete(self, version);
+                panel_games::handle_install_complete(self, &version);
             },
             Controls::UninstallComplete => panel_games::handle_uninstall_complete(self),
             Controls::WorkerError(e) => panel_games::handle_worker_error(self, &e),

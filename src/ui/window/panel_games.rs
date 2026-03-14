@@ -76,12 +76,12 @@ pub(super) fn handle_progress(model: &Window, msg: String) {
 }
 
 /// Clear progress and mark the game as installed.
-pub(super) fn handle_install_complete(model: &mut Window, version: String) {
+pub(super) fn handle_install_complete(model: &mut Window, version: &str) {
     let (dll, arch) = model.pending_install.take().unwrap_or((DllOverride::Dxgi, ExeArch::X86_64));
     model.game_detail.emit(game_detail::Controls::ClearProgress);
-    model.game_detail.emit(game_detail::Controls::MarkInstalled { version: version.clone(), dll, arch });
+    model.game_detail.emit(game_detail::Controls::MarkInstalled { version: version.to_string(), dll, arch });
     if let Some(id) = &model.current_game_id {
-        let status = InstallStatus::Installed { dll, arch, version: Some(version.clone()) };
+        let status = InstallStatus::Installed { dll, arch, version: Some(version.to_string()) };
         if let Some(game) = model.games.iter_mut().find(|g| &g.id == id) {
             game.status = status.clone();
         }
@@ -93,7 +93,8 @@ pub(super) fn handle_install_complete(model: &mut Window, version: String) {
         }
         model.game_list.emit(game_list::Controls::SetGameStatus {
             id: id.clone(),
-            version: Some(version.clone()),
+            version: Some(version.to_string()),
+            latest_version: model.latest_version.clone(),
         });
     }
 }
@@ -115,6 +116,7 @@ pub(super) fn handle_uninstall_complete(model: &mut Window) {
         model.game_list.emit(game_list::Controls::SetGameStatus {
             id: id.clone(),
             version: None,
+            latest_version: model.latest_version.clone(),
         });
     }
 }

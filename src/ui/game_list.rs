@@ -37,12 +37,14 @@ pub enum Controls {
     AddGame(Game),
     /// Remove the row for the given game ID.
     RemoveGame(String),
-    /// Update the install-status subtitle for a game row.
+    /// Update the install-status subtitle and update-pill visibility for a game row.
     SetGameStatus {
         /// Stable game ID.
         id: String,
         /// Installed version string, or `None` if `ReShade` is not installed.
         version: Option<String>,
+        /// Latest known `ReShade` version, or `None` if not yet fetched.
+        latest_version: Option<String>,
     },
 }
 
@@ -185,7 +187,7 @@ impl SimpleComponent for GameList {
                 self.games.retain(|g| g.id != id);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
             },
-            Controls::SetGameStatus { id, version } => {
+            Controls::SetGameStatus { id, version, latest_version } => {
                 let subtitle = match &version {
                     Some(v) if !v.is_empty() => format!("ReShade {v}"),
                     Some(_) => fl!("reshade-installed"),
@@ -193,6 +195,15 @@ impl SimpleComponent for GameList {
                 };
                 if let Some(row) = self.auto_rows.get(&id).or_else(|| self.manual_rows.get(&id)) {
                     row.set_subtitle(&subtitle);
+                }
+                let outdated = match (&version, &latest_version) {
+                    (Some(installed), Some(latest)) => {
+                        crate::reshade::reshade::is_version_outdated(installed, latest)
+                    },
+                    _ => false,
+                };
+                if let Some(pill) = self.auto_update_pills.get(&id).or_else(|| self.manual_update_pills.get(&id)) {
+                    pill.set_visible(outdated);
                 }
             },
         }
