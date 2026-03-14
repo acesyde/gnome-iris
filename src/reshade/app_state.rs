@@ -1,6 +1,6 @@
 //! Shared application state passed between UI components.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use directories::ProjectDirs;
@@ -18,7 +18,7 @@ pub type Shared<T> = Arc<RwLock<T>>;
 pub struct AppState {
     /// All games known to the application (Steam-discovered + manually added).
     pub games: Vec<Game>,
-    /// Currently installed ReShade version, if any.
+    /// Currently installed `ReShade` version, if any.
     pub reshade_version: Option<String>,
     /// Global configuration.
     pub config: GlobalConfig,
@@ -28,6 +28,7 @@ pub struct AppState {
 
 impl AppState {
     /// Initializes app state from disk (or defaults if first run).
+    #[must_use]
     pub fn load() -> Self {
         let data_dir = iris_data_dir();
         let config = load_config(&data_dir);
@@ -42,6 +43,9 @@ impl AppState {
     }
 
     /// Persists the current state to disk.
+    ///
+    /// # Errors
+    /// Returns an error if serialization or disk write fails.
     pub fn save(&self) -> anyhow::Result<()> {
         std::fs::create_dir_all(&self.data_dir)?;
         let config_json = serde_json::to_string_pretty(&self.config)?;
@@ -53,16 +57,18 @@ impl AppState {
 }
 
 /// Returns the XDG data directory for gnome-iris (`$XDG_DATA_HOME/iris/`).
+#[must_use]
 pub fn iris_data_dir() -> PathBuf {
-    ProjectDirs::from("org", "gnome", "Iris")
-        .map(|d| d.data_dir().to_path_buf())
-        .unwrap_or_else(|| {
+    ProjectDirs::from("org", "gnome", "Iris").map_or_else(
+        || {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_owned());
             PathBuf::from(home).join(".local/share/iris")
-        })
+        },
+        |d| d.data_dir().to_path_buf(),
+    )
 }
 
-fn load_config(data_dir: &PathBuf) -> GlobalConfig {
+fn load_config(data_dir: &Path) -> GlobalConfig {
     let path = data_dir.join("config.json");
     std::fs::read_to_string(path)
         .ok()
@@ -70,7 +76,7 @@ fn load_config(data_dir: &PathBuf) -> GlobalConfig {
         .unwrap_or_default()
 }
 
-fn load_games(data_dir: &PathBuf) -> Vec<Game> {
+fn load_games(data_dir: &Path) -> Vec<Game> {
     let path = data_dir.join("games.json");
     std::fs::read_to_string(path)
         .ok()
@@ -78,11 +84,8 @@ fn load_games(data_dir: &PathBuf) -> Vec<Game> {
         .unwrap_or_default()
 }
 
-fn load_reshade_version(data_dir: &PathBuf) -> Option<String> {
-    UpdateCache::new(data_dir.clone())
-        .read_version()
-        .ok()
-        .flatten()
+fn load_reshade_version(data_dir: &Path) -> Option<String> {
+    UpdateCache::new(data_dir.to_path_buf()).read_version().ok().flatten()
 }
 
 #[cfg(test)]
@@ -102,7 +105,7 @@ mod tests {
         state.config.update_interval_hours = 8;
         state.save().unwrap();
 
-        let reloaded = load_config(&dir.path().to_path_buf());
+        let reloaded = load_config(dir.path());
         assert_eq!(reloaded.update_interval_hours, 8);
     }
 
@@ -111,18 +114,14 @@ mod tests {
         use crate::reshade::game::{Game, GameSource};
         let dir = tempdir().unwrap();
         let state = AppState {
-            games: vec![Game::new(
-                "Test Game".into(),
-                PathBuf::from("/games/test"),
-                GameSource::Manual,
-            )],
+            games: vec![Game::new("Test Game".into(), PathBuf::from("/games/test"), GameSource::Manual)],
             reshade_version: Some("6.1.0".into()),
             config: GlobalConfig::default(),
             data_dir: dir.path().to_path_buf(),
         };
         state.save().unwrap();
 
-        let reloaded = load_games(&dir.path().to_path_buf());
+        let reloaded = load_games(dir.path());
         assert_eq!(reloaded.len(), 1);
         assert_eq!(reloaded[0].name, "Test Game");
     }

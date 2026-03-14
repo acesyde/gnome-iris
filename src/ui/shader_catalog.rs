@@ -11,16 +11,18 @@ use crate::reshade::catalog::{CatalogEntry, KNOWN_REPOS};
 use crate::reshade::config::ShaderRepo;
 
 /// Initialisation data for [`ShaderCatalog`].
+#[allow(clippy::module_name_repetitions)]
 pub struct ShaderCatalogInit {
     /// Base data directory (e.g. `~/.local/share/iris/`).
     pub data_dir: PathBuf,
-    /// Custom repos from config (those not in KNOWN_REPOS) to pre-populate.
+    /// Custom repos from config (those not in `KNOWN_REPOS`) to pre-populate.
     pub custom_repos: Vec<ShaderRepo>,
 }
 
 /// Shader catalog component model.
 pub struct ShaderCatalog {
     /// Base data directory.
+    #[allow(dead_code)]
     data_dir: PathBuf,
     /// `local_name`s of repos already present on disk.
     installed: HashSet<String>,
@@ -103,11 +105,7 @@ impl SimpleComponent for ShaderCatalog {
         }
     }
 
-    fn init(
-        init: ShaderCatalogInit,
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    fn init(init: ShaderCatalogInit, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let repos_dir = init.data_dir.join("ReShade_shaders");
 
         let mut installed: HashSet<String> = KNOWN_REPOS
@@ -176,13 +174,9 @@ impl SimpleComponent for ShaderCatalog {
         open_btn.add_css_class("flat");
         open_btn.set_tooltip_text(Some(&fl!("open-shaders-folder")));
         {
-            let dir = repos_dir.clone();
             open_btn.connect_clicked(move |_| {
-                let _ = std::fs::create_dir_all(&dir);
-                std::process::Command::new("xdg-open")
-                    .arg(dir.as_os_str())
-                    .spawn()
-                    .ok();
+                let _ = std::fs::create_dir_all(&repos_dir);
+                std::process::Command::new("xdg-open").arg(repos_dir.as_os_str()).spawn().ok();
             });
         }
 
@@ -214,8 +208,7 @@ impl SimpleComponent for ShaderCatalog {
         // Pre-populate custom repos.
         for repo in &init.custom_repos {
             let is_installed = model.installed.contains(&repo.local_name);
-            let (row, spinner) =
-                build_custom_row(repo, is_installed, &mut model.row_buttons, &sender);
+            let (row, spinner) = build_custom_row(repo, is_installed, &mut model.row_buttons, &sender);
             model.row_spinners.insert(repo.local_name.clone(), spinner);
             widgets.custom_group.add(&row);
             model.custom_rows.insert(repo.local_name.clone(), row);
@@ -232,10 +225,8 @@ impl SimpleComponent for ShaderCatalog {
                 }
                 self.syncing = Some(entry.local_name.to_owned());
                 begin_sync(entry.local_name, &self.row_buttons, &self.row_spinners);
-                sender
-                    .output(Signal::DownloadRequested(entry.to_shader_repo()))
-                    .ok();
-            }
+                sender.output(Signal::DownloadRequested(entry.to_shader_repo())).ok();
+            },
             Controls::DownloadAll => {
                 if self.syncing.is_some() {
                     return;
@@ -252,21 +243,20 @@ impl SimpleComponent for ShaderCatalog {
                     begin_sync(&name, &self.row_buttons, &self.row_spinners);
                     sender.output(Signal::DownloadRequested(repo)).ok();
                 }
-            }
+            },
             Controls::AddCustomRepoRequested => {
                 sender.output(Signal::AddCustomRepoRequested).ok();
-            }
+            },
             Controls::AddCustomRepo(repo) => {
                 let is_installed = self.installed.contains(&repo.local_name);
-                let (row, spinner) =
-                    build_custom_row(&repo, is_installed, &mut self.row_buttons, &sender);
+                let (row, spinner) = build_custom_row(&repo, is_installed, &mut self.row_buttons, &sender);
                 self.row_spinners.insert(repo.local_name.clone(), spinner);
                 self.custom_group.add(&row);
                 self.custom_rows.insert(repo.local_name.clone(), row);
-            }
+            },
             Controls::RemoveCustomRepoRequested(repo) => {
                 sender.output(Signal::RemoveCustomRepoRequested(repo)).ok();
-            }
+            },
             Controls::RemoveCustomRepo(repo) => {
                 self.installed.remove(&repo.local_name);
                 self.row_buttons.remove(&repo.local_name);
@@ -274,7 +264,7 @@ impl SimpleComponent for ShaderCatalog {
                 if let Some(row) = self.custom_rows.remove(&repo.local_name) {
                     self.custom_group.remove(&row);
                 }
-            }
+            },
             Controls::DownloadCustomRepo(repo) => {
                 if self.syncing.is_some() {
                     return;
@@ -282,10 +272,10 @@ impl SimpleComponent for ShaderCatalog {
                 self.syncing = Some(repo.local_name.clone());
                 begin_sync(&repo.local_name, &self.row_buttons, &self.row_spinners);
                 sender.output(Signal::DownloadRequested(repo)).ok();
-            }
+            },
             Controls::SyncProgress(msg) => {
                 log::debug!("Shader sync: {msg}");
-            }
+            },
             Controls::SyncComplete => {
                 if let Some(local_name) = self.syncing.take() {
                     self.installed.insert(local_name.clone());
@@ -297,7 +287,7 @@ impl SimpleComponent for ShaderCatalog {
                         sender.output(Signal::DownloadRequested(next)).ok();
                     }
                 }
-            }
+            },
             Controls::SyncError(e) => {
                 if let Some(local_name) = self.syncing.take() {
                     log::error!("Failed to sync {local_name}: {e}");
@@ -309,7 +299,7 @@ impl SimpleComponent for ShaderCatalog {
                         sender.output(Signal::DownloadRequested(next)).ok();
                     }
                 }
-            }
+            },
         }
     }
 }
@@ -323,10 +313,10 @@ fn begin_sync(
     if let Some(sp) = row_spinners.get(local_name) {
         sp.start();
     }
-    if let Some(btn) = row_buttons.get(local_name) {
-        if let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok()) {
-            stack.set_visible_child_name("spinner");
-        }
+    if let Some(btn) = row_buttons.get(local_name)
+        && let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok())
+    {
+        stack.set_visible_child_name("spinner");
     }
 }
 
@@ -379,7 +369,7 @@ fn build_custom_row(
         let s = sender.clone();
         let repo_clone = repo.clone();
         dl_btn.connect_clicked(move |_| {
-            s.input(Controls::DownloadCustomRepo(repo_clone.clone()))
+            s.input(Controls::DownloadCustomRepo(repo_clone.clone()));
         });
     }
     // Spinner (hidden until syncing) — stacked with the download button.
@@ -404,7 +394,7 @@ fn build_custom_row(
         let s = sender.clone();
         let repo_clone = repo.clone();
         rm_btn.connect_clicked(move |_| {
-            s.input(Controls::RemoveCustomRepoRequested(repo_clone.clone()))
+            s.input(Controls::RemoveCustomRepoRequested(repo_clone.clone()));
         });
     }
     row.add_suffix(&rm_btn);

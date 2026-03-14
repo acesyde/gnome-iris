@@ -1,4 +1,4 @@
-//! Dialog for choosing which cached ReShade version to install into a game.
+//! Dialog for choosing which cached `ReShade` version to install into a game.
 
 use relm4::adw::prelude::*;
 use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk};
@@ -50,11 +50,8 @@ impl PickReshadeVersionDialog {
     /// Examples: `"v6.3.0"` → `"6.3.0"`, `"v6.3.0-Addon"` → `"6.3.0 — Addon Support"`.
     fn display_title(key: &str) -> String {
         let base = key.strip_prefix('v').unwrap_or(key);
-        if let Some(ver) = base.strip_suffix("-Addon") {
-            format!("{ver} \u{2014} {}", fl!("addon-support"))
-        } else {
-            base.to_owned()
-        }
+        base.strip_suffix("-Addon")
+            .map_or_else(|| base.to_owned(), |ver| format!("{ver} \u{2014} {}", fl!("addon-support")))
     }
 }
 
@@ -113,11 +110,7 @@ impl SimpleComponent for PickReshadeVersionDialog {
         }
     }
 
-    fn init(
-        (): (),
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let mut model = Self {
             selected: None,
             dialog: adw::Dialog::new(),
@@ -133,9 +126,7 @@ impl SimpleComponent for PickReshadeVersionDialog {
             let s = sender.clone();
             move |_| s.input(Controls::Cancel)
         });
-        widgets.install_btn.connect_clicked({
-            move |_| sender.input(Controls::Confirm)
-        });
+        widgets.install_btn.connect_clicked(move |_| sender.input(Controls::Confirm));
 
         ComponentParts { model, widgets }
     }
@@ -180,20 +171,20 @@ impl SimpleComponent for PickReshadeVersionDialog {
                 }
                 // 5. Present with the window as the transient parent.
                 self.dialog.present(Some(&parent));
-            }
+            },
             Controls::SelectVersion(v) => {
                 self.selected = Some(v);
-            }
+            },
             Controls::Cancel => {
                 self.selected = None;
                 self.dialog.close();
-            }
+            },
             Controls::Confirm => {
                 if let Some(version) = self.selected.take() {
                     sender.output(Signal::VersionChosen(version)).ok();
                     self.dialog.close();
                 }
-            }
+            },
         }
     }
 }

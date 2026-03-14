@@ -1,6 +1,6 @@
 //! Core game data model.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
@@ -18,7 +18,7 @@ pub struct Game {
     pub path: PathBuf,
     /// Where this game was discovered.
     pub source: GameSource,
-    /// Current ReShade install status.
+    /// Current `ReShade` install status.
     pub status: InstallStatus,
     /// Per-game shader repo opt-outs.
     pub shader_overrides: ShaderOverrides,
@@ -31,6 +31,7 @@ pub struct Game {
 
 impl Game {
     /// Creates a new uninstalled game entry.
+    #[must_use]
     pub fn new(name: String, path: PathBuf, source: GameSource) -> Self {
         let id = Self::make_id(&path);
         Self {
@@ -45,7 +46,8 @@ impl Game {
     }
 
     /// Derives a stable ID from the game path (SHA-512 hex).
-    pub fn make_id(path: &PathBuf) -> String {
+    #[must_use]
+    pub fn make_id(path: &Path) -> String {
         let mut hasher = Sha512::new();
         hasher.update(path.to_string_lossy().as_bytes());
         format!("{:x}", hasher.finalize())
@@ -54,6 +56,7 @@ impl Game {
 
 /// How a game was discovered.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::module_name_repetitions)]
 pub enum GameSource {
     /// Discovered from the Steam library.
     Steam {
@@ -64,14 +67,14 @@ pub enum GameSource {
     Manual,
 }
 
-/// ReShade installation status for a game.
+/// `ReShade` installation status for a game.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InstallStatus {
-    /// ReShade is not installed for this game.
+    /// `ReShade` is not installed for this game.
     NotInstalled,
-    /// ReShade is installed with these settings.
+    /// `ReShade` is installed with these settings.
     Installed {
-        /// The DLL that ReShade is masquerading as.
+        /// The DLL that `ReShade` is masquerading as.
         dll: DllOverride,
         /// Detected executable architecture.
         arch: ExeArch,
@@ -79,13 +82,14 @@ pub enum InstallStatus {
 }
 
 impl InstallStatus {
-    /// Returns `true` if ReShade is currently installed.
-    pub fn is_installed(&self) -> bool {
+    /// Returns `true` if `ReShade` is currently installed.
+    #[must_use]
+    pub const fn is_installed(&self) -> bool {
         matches!(self, Self::Installed { .. })
     }
 }
 
-/// The Windows DLL name that ReShade replaces.
+/// The Windows DLL name that `ReShade` replaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DllOverride {
     /// `d3d8.dll`
@@ -106,7 +110,8 @@ pub enum DllOverride {
 
 impl DllOverride {
     /// Returns the filename used for the symlink in the game directory.
-    pub fn symlink_name(self) -> &'static str {
+    #[must_use]
+    pub const fn symlink_name(self) -> &'static str {
         match self {
             Self::D3d8 => "d3d8.dll",
             Self::D3d9 => "d3d9.dll",
@@ -119,16 +124,9 @@ impl DllOverride {
     }
 
     /// All supported DLL overrides (for UI dropdown).
-    pub fn all() -> &'static [Self] {
-        &[
-            Self::D3d8,
-            Self::D3d9,
-            Self::D3d11,
-            Self::Ddraw,
-            Self::Dinput8,
-            Self::Dxgi,
-            Self::OpenGl32,
-        ]
+    #[must_use]
+    pub const fn all() -> &'static [Self] {
+        &[Self::D3d8, Self::D3d9, Self::D3d11, Self::Ddraw, Self::Dinput8, Self::Dxgi, Self::OpenGl32]
     }
 }
 
@@ -148,8 +146,9 @@ pub enum ExeArch {
 }
 
 impl ExeArch {
-    /// Returns the ReShade DLL filename for this architecture.
-    pub fn reshade_dll(self) -> &'static str {
+    /// Returns the `ReShade` DLL filename for this architecture.
+    #[must_use]
+    pub const fn reshade_dll(self) -> &'static str {
         match self {
             Self::X86 => "ReShade32.dll",
             Self::X86_64 => "ReShade64.dll",
@@ -157,7 +156,8 @@ impl ExeArch {
     }
 
     /// Returns the d3dcompiler suffix for this architecture.
-    pub fn d3dcompiler_suffix(self) -> &'static str {
+    #[must_use]
+    pub const fn d3dcompiler_suffix(self) -> &'static str {
         match self {
             Self::X86 => "32",
             Self::X86_64 => "64",

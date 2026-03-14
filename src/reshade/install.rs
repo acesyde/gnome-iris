@@ -1,4 +1,4 @@
-//! Install and uninstall ReShade into a game directory via symlinks.
+//! Install and uninstall `ReShade` into a game directory via symlinks.
 
 use std::path::{Path, PathBuf};
 
@@ -6,24 +6,19 @@ use anyhow::{Context, Result};
 
 use crate::reshade::game::{DllOverride, ExeArch, InstallStatus};
 
-/// Installs ReShade into `game_dir` by creating symlinks.
+/// Installs `ReShade` into `game_dir` by creating symlinks.
 ///
 /// Links:
 /// - `ReShade{32,64}.dll` → `<dll>.dll`
 /// - `d3dcompiler_47.dll.<arch>` → `d3dcompiler_47.dll`
 /// - `ReShade_shaders/Merged` → `reshade-shaders` (only if Merged exists)
-pub fn install_reshade(
-    base: &Path,
-    game_dir: &Path,
-    version: &str,
-    dll: DllOverride,
-    arch: ExeArch,
-) -> Result<()> {
+///
+/// # Errors
+/// Returns an error if any symlink creation fails.
+#[allow(clippy::module_name_repetitions)]
+pub fn install_reshade(base: &Path, game_dir: &Path, version: &str, dll: DllOverride, arch: ExeArch) -> Result<()> {
     // ReShade DLL → <dll>.dll
-    let reshade_src = base
-        .join("reshade")
-        .join(version)
-        .join(arch.reshade_dll());
+    let reshade_src = base.join("reshade").join(version).join(arch.reshade_dll());
     let dll_dest = game_dir.join(dll.symlink_name());
     symlink_force(&reshade_src, &dll_dest)?;
 
@@ -42,7 +37,10 @@ pub fn install_reshade(
     Ok(())
 }
 
-/// Removes all ReShade symlinks from `game_dir`.
+/// Removes all `ReShade` symlinks from `game_dir`.
+///
+/// # Errors
+/// Returns an error if any symlink removal fails.
 pub fn uninstall_reshade(game_dir: &Path, dll: DllOverride) -> Result<()> {
     let files = [
         dll.symlink_name().to_owned(),
@@ -55,8 +53,7 @@ pub fn uninstall_reshade(game_dir: &Path, dll: DllOverride) -> Result<()> {
     for name in &files {
         let path = game_dir.join(name);
         if path.is_symlink() {
-            std::fs::remove_file(&path)
-                .with_context(|| format!("Cannot remove {}", path.display()))?;
+            std::fs::remove_file(&path).with_context(|| format!("Cannot remove {}", path.display()))?;
         }
     }
     Ok(())
@@ -72,17 +69,19 @@ fn symlink_force(src: &Path, dest: &Path) -> Result<()> {
 }
 
 /// Returns the default DLL override for a given architecture.
-pub fn default_dll_for_arch(arch: ExeArch) -> DllOverride {
+#[must_use]
+pub const fn default_dll_for_arch(arch: ExeArch) -> DllOverride {
     match arch {
         ExeArch::X86 => DllOverride::D3d9,
         ExeArch::X86_64 => DllOverride::Dxgi,
     }
 }
 
-/// Detects the current ReShade install status by inspecting symlinks in `game_dir`.
+/// Detects the current `ReShade` install status by inspecting symlinks in `game_dir`.
 ///
 /// Scans for any known DLL override symlink. When found, reads the symlink
 /// target to determine architecture from the DLL name (`ReShade64` vs `ReShade32`).
+#[must_use]
 pub fn detect_install_status(game_dir: &Path) -> InstallStatus {
     for &dll in DllOverride::all() {
         let symlink = game_dir.join(dll.symlink_name());
@@ -107,6 +106,7 @@ pub fn detect_install_status(game_dir: &Path) -> InstallStatus {
 }
 
 /// Returns all `.exe` files in `game_dir`.
+#[must_use]
 pub fn find_exes(game_dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(game_dir) else {
         return vec![];
@@ -114,7 +114,7 @@ pub fn find_exes(game_dir: &Path) -> Vec<PathBuf> {
     entries
         .flatten()
         .map(|e| e.path())
-        .filter(|p| p.extension().map(|e| e == "exe").unwrap_or(false))
+        .filter(|p| p.extension().is_some_and(|e| e == "exe"))
         .collect()
 }
 
@@ -129,11 +129,7 @@ mod tests {
         std::fs::create_dir_all(&versioned).unwrap();
         std::fs::write(versioned.join(dll_name), "fake dll").unwrap();
         let suffix = arch.d3dcompiler_suffix();
-        std::fs::write(
-            base.join(format!("d3dcompiler_47.dll.{suffix}")),
-            "fake d3dc",
-        )
-        .unwrap();
+        std::fs::write(base.join(format!("d3dcompiler_47.dll.{suffix}")), "fake d3dc").unwrap();
     }
 
     #[test]
@@ -147,14 +143,8 @@ mod tests {
 
         install_reshade(base.path(), game_dir.path(), version, dll, arch).unwrap();
 
-        assert!(
-            game_dir.path().join("dxgi.dll").is_symlink(),
-            "dxgi.dll symlink missing"
-        );
-        assert!(
-            game_dir.path().join("d3dcompiler_47.dll").is_symlink(),
-            "d3dcompiler_47.dll symlink missing"
-        );
+        assert!(game_dir.path().join("dxgi.dll").is_symlink(), "dxgi.dll symlink missing");
+        assert!(game_dir.path().join("d3dcompiler_47.dll").is_symlink(), "d3dcompiler_47.dll symlink missing");
     }
 
     #[test]
@@ -193,7 +183,10 @@ mod tests {
         let status = detect_install_status(game_dir.path());
         assert!(matches!(
             status,
-            InstallStatus::Installed { dll: DllOverride::Dxgi, arch: ExeArch::X86_64 }
+            InstallStatus::Installed {
+                dll: DllOverride::Dxgi,
+                arch: ExeArch::X86_64
+            }
         ));
     }
 

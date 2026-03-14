@@ -1,4 +1,4 @@
-//! Async worker for downloading and installing ReShade.
+//! Async worker for downloading and installing `ReShade`.
 
 use std::path::PathBuf;
 
@@ -12,7 +12,7 @@ use crate::reshade::{d3dcompiler, install, reshade};
 /// Input commands for the install worker.
 #[derive(Debug)]
 pub enum Controls {
-    /// Install a pre-cached ReShade version into the given game directory.
+    /// Install a pre-cached `ReShade` version into the given game directory.
     Install {
         /// App data directory.
         data_dir: PathBuf,
@@ -25,14 +25,14 @@ pub enum Controls {
         /// The cached version key to install, e.g. `"v6.3.0"` or `"v6.3.0-Addon"`.
         version: String,
     },
-    /// Remove ReShade from the given game directory.
+    /// Remove `ReShade` from the given game directory.
     Uninstall {
         /// Game directory to uninstall from.
         game_dir: PathBuf,
         /// The DLL override currently in use.
         dll: DllOverride,
     },
-    /// Download a specific ReShade version to the local cache (no game install).
+    /// Download a specific `ReShade` version to the local cache (no game install).
     DownloadVersion {
         /// App data directory.
         data_dir: PathBuf,
@@ -50,7 +50,7 @@ pub enum Signal {
     Progress(String),
     /// Installation finished successfully.
     InstallComplete {
-        /// The installed ReShade version string.
+        /// The installed `ReShade` version string.
         version: String,
     },
     /// Uninstall finished successfully.
@@ -75,7 +75,7 @@ impl Worker for InstallWorker {
     type Input = Controls;
     type Output = Signal;
 
-    fn init(_: (), _sender: ComponentSender<Self>) -> Self {
+    fn init((): (), _sender: ComponentSender<Self>) -> Self {
         Self
     }
 
@@ -88,41 +88,31 @@ impl Worker for InstallWorker {
                 arch,
                 version,
             } => {
-                let sender2 = sender.clone();
                 relm4::spawn(async move {
-                    if let Err(e) =
-                        do_install(&data_dir, &game_dir, dll, arch, &version, &sender2).await
-                    {
-                        sender2.output(Signal::Error(e.to_string())).ok();
-                    }
-                });
-            }
-            Controls::Uninstall { game_dir, dll } => {
-                match install::uninstall_reshade(&game_dir, dll) {
-                    Ok(()) => {
-                        sender.output(Signal::UninstallComplete).ok();
-                    }
-                    Err(e) => {
+                    if let Err(e) = do_install(&data_dir, &game_dir, dll, arch, &version, &sender) {
                         sender.output(Signal::Error(e.to_string())).ok();
                     }
-                }
-            }
+                });
+            },
+            Controls::Uninstall { game_dir, dll } => match install::uninstall_reshade(&game_dir, dll) {
+                Ok(()) => {
+                    sender.output(Signal::UninstallComplete).ok();
+                },
+                Err(e) => {
+                    sender.output(Signal::Error(e.to_string())).ok();
+                },
+            },
             Controls::DownloadVersion {
                 data_dir,
                 version,
                 addon,
             } => {
-                let sender2 = sender.clone();
                 relm4::spawn(async move {
-                    if let Err(e) =
-                        do_download_version(&data_dir, &version, addon, &sender2).await
-                    {
-                        sender2
-                            .output(Signal::DownloadVersionError(e.to_string()))
-                            .ok();
+                    if let Err(e) = do_download_version(&data_dir, &version, addon, &sender).await {
+                        sender.output(Signal::DownloadVersionError(e.to_string())).ok();
                     }
                 });
-            }
+            },
         }
     }
 }
@@ -133,14 +123,8 @@ async fn do_download_version(
     addon: bool,
     sender: &ComponentSender<InstallWorker>,
 ) -> anyhow::Result<()> {
-    let dir_key = if addon {
-        format!("{version}-Addon")
-    } else {
-        version.to_owned()
-    };
-    sender
-        .output(Signal::Progress(format!("Downloading ReShade {dir_key}...")))
-        .ok();
+    let dir_key = if addon { format!("{version}-Addon") } else { version.to_owned() };
+    sender.output(Signal::Progress(format!("Downloading ReShade {dir_key}..."))).ok();
     let version_dir = reshade::version_dir(data_dir, &dir_key);
     if !version_dir.join(ExeArch::X86_64.reshade_dll()).exists() {
         let url = reshade::download_url(version, addon);
@@ -158,7 +142,7 @@ async fn do_download_version(
     Ok(())
 }
 
-async fn do_install(
+fn do_install(
     data_dir: &std::path::Path,
     game_dir: &std::path::Path,
     dll: DllOverride,
@@ -168,15 +152,11 @@ async fn do_install(
 ) -> anyhow::Result<()> {
     let version_dir = reshade::version_dir(data_dir, version);
     if !version_dir.join(arch.reshade_dll()).exists() {
-        anyhow::bail!(
-            "ReShade {version} is not cached locally — download it in Preferences first"
-        );
+        anyhow::bail!("ReShade {version} is not cached locally — download it in Preferences first");
     }
 
     if !d3dcompiler::is_installed(data_dir, arch) {
-        sender
-            .output(Signal::Progress("Installing d3dcompiler_47.dll...".into()))
-            .ok();
+        sender.output(Signal::Progress("Installing d3dcompiler_47.dll...".into())).ok();
     }
     d3dcompiler::ensure(data_dir, arch).context("Failed to install d3dcompiler_47.dll")?;
 
@@ -187,7 +167,9 @@ async fn do_install(
     // registered in the cache from the Preferences download step.
 
     sender
-        .output(Signal::InstallComplete { version: version.to_owned() })
+        .output(Signal::InstallComplete {
+            version: version.to_owned(),
+        })
         .ok();
     Ok(())
 }

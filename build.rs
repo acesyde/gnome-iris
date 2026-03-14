@@ -17,11 +17,7 @@ fn main() {
         ["view-list", "folder-open"],
     );
 
-    glib_build_tools::compile_resources(
-        &["data/icons"],
-        "data/icons/icons.gresource.xml",
-        "icons.gresources",
-    );
+    glib_build_tools::compile_resources(&["data/icons"], "data/icons/icons.gresource.xml", "icons.gresources");
 
     std::fs::create_dir_all(SCHEMAS_DIR).expect("Could not create schemas output dir");
     let status = Command::new("glib-compile-schemas")

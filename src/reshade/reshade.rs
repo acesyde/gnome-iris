@@ -1,4 +1,4 @@
-//! ReShade version fetching and extraction.
+//! `ReShade` version fetching and extraction.
 
 use std::path::{Path, PathBuf};
 
@@ -10,7 +10,7 @@ struct GithubTag {
     name: String,
 }
 
-/// Fetches the latest ReShade version string from the GitHub tags API.
+/// Fetches the latest `ReShade` version string from the GitHub tags API.
 ///
 /// Queries `https://api.github.com/repos/crosire/reshade/tags` and returns
 /// the tag name of the most recent release.
@@ -36,7 +36,8 @@ pub async fn fetch_latest_version() -> Result<String> {
         .ok_or_else(|| anyhow!("GitHub tags API returned an empty list"))
 }
 
-/// Builds the download URL for a given version.
+/// Builds the download URL for a given `ReShade` version.
+#[must_use]
 pub fn download_url(version: &str, addon_support: bool) -> String {
     let v = version.strip_prefix('v').unwrap_or(version);
     if addon_support {
@@ -46,10 +47,13 @@ pub fn download_url(version: &str, addon_support: bool) -> String {
     }
 }
 
-/// Downloads a ReShade `.exe` and extracts it to `dest_dir`.
+/// Downloads a `ReShade` `.exe` and extracts it to `dest_dir`.
 ///
 /// The `.exe` is a self-extracting zip. We extract it directly with the `zip` crate.
 /// Returns an error on network failure, timeout, or a non-2xx HTTP status.
+///
+/// # Errors
+/// Returns an error if the network request fails or if extraction fails.
 pub async fn download_and_extract(url: &str, dest_dir: &Path) -> Result<()> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(60))
@@ -62,16 +66,16 @@ pub async fn download_and_extract(url: &str, dest_dir: &Path) -> Result<()> {
         .with_context(|| format!("Failed to connect to {url}"))?
         .error_for_status()
         .with_context(|| format!("Server returned an error for {url}"))?;
-    let bytes = response
-        .bytes()
-        .await
-        .with_context(|| format!("Failed to read response from {url}"))?;
+    let bytes = response.bytes().await.with_context(|| format!("Failed to read response from {url}"))?;
     std::fs::create_dir_all(dest_dir)?;
     extract_zip_from_bytes(&bytes, dest_dir)?;
     Ok(())
 }
 
 /// Extracts all `.dll` entries from a zip archive contained in `bytes` into `dest_dir`.
+///
+/// # Errors
+/// Returns an error if the bytes are not a valid zip archive or if file creation fails.
 pub fn extract_zip_from_bytes(bytes: &[u8], dest_dir: &Path) -> Result<()> {
     use std::io::Cursor;
     let cursor = Cursor::new(bytes);
@@ -80,18 +84,18 @@ pub fn extract_zip_from_bytes(bytes: &[u8], dest_dir: &Path) -> Result<()> {
         let mut entry = archive.by_index(i)?;
         let name = entry.name().to_owned();
         // Only extract DLL files we care about
-        if !name.ends_with(".dll") {
+        if !std::path::Path::new(&name).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("dll")) {
             continue;
         }
         let dest = dest_dir.join(&name);
-        let mut out = std::fs::File::create(&dest)
-            .with_context(|| format!("Cannot create {}", dest.display()))?;
+        let mut out = std::fs::File::create(&dest).with_context(|| format!("Cannot create {}", dest.display()))?;
         std::io::copy(&mut entry, &mut out)?;
     }
     Ok(())
 }
 
-/// Returns the versioned directory for a given ReShade version.
+/// Returns the versioned directory for a given `ReShade` version.
+#[must_use]
 pub fn version_dir(base: &Path, version: &str) -> PathBuf {
     base.join("reshade").join(version)
 }
@@ -103,27 +107,21 @@ fn parse_version_key(s: &str) -> ((u64, u64, u64), bool) {
     let addon = s.ends_with("-Addon");
     let base = s.strip_suffix("-Addon").unwrap_or(s);
     let mut parts = base.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
-    (
-        (
-            parts.next().unwrap_or(0),
-            parts.next().unwrap_or(0),
-            parts.next().unwrap_or(0),
-        ),
-        addon,
-    )
+    ((parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0)), addon)
 }
 
-/// Returns all installed ReShade versions found under `base/reshade/`,
+/// Returns all installed `ReShade` versions found under `base/reshade/`,
 /// sorted in ascending semver order. The `latest` symlink is excluded.
+///
+/// # Errors
+/// Returns an error if the `reshade` directory cannot be read.
 pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
     let reshade_dir = base.join("reshade");
     if !reshade_dir.exists() {
         return Ok(Vec::new());
     }
     let mut versions = Vec::new();
-    for entry in std::fs::read_dir(&reshade_dir)
-        .with_context(|| format!("Cannot read {}", reshade_dir.display()))?
-    {
+    for entry in std::fs::read_dir(&reshade_dir).with_context(|| format!("Cannot read {}", reshade_dir.display()))? {
         let entry = entry?;
         let path = entry.path();
         if path.is_symlink() || !path.is_dir() {
@@ -133,7 +131,7 @@ pub fn list_installed_versions(base: &Path) -> Result<Vec<String>> {
             versions.push(name.to_owned());
         }
     }
-    versions.sort_by(|a, b| parse_version_key(a).cmp(&parse_version_key(b)));
+    versions.sort_by_key(|a| parse_version_key(a));
     Ok(versions)
 }
 
@@ -143,27 +141,15 @@ mod tests {
 
     #[test]
     fn build_download_url_standard() {
-        assert_eq!(
-            download_url("6.7.3", false),
-            "https://reshade.me/downloads/ReShade_Setup_6.7.3.exe"
-        );
+        assert_eq!(download_url("6.7.3", false), "https://reshade.me/downloads/ReShade_Setup_6.7.3.exe");
         // v-prefixed tag names (GitHub API) must be stripped
-        assert_eq!(
-            download_url("v6.7.3", false),
-            "https://reshade.me/downloads/ReShade_Setup_6.7.3.exe"
-        );
+        assert_eq!(download_url("v6.7.3", false), "https://reshade.me/downloads/ReShade_Setup_6.7.3.exe");
     }
 
     #[test]
     fn build_download_url_addon() {
-        assert_eq!(
-            download_url("6.7.3", true),
-            "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe"
-        );
-        assert_eq!(
-            download_url("v6.7.3", true),
-            "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe"
-        );
+        assert_eq!(download_url("6.7.3", true), "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe");
+        assert_eq!(download_url("v6.7.3", true), "https://reshade.me/downloads/ReShade_Setup_6.7.3_Addon.exe");
     }
 
     #[test]

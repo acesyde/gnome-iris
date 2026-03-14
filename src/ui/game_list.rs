@@ -37,7 +37,7 @@ pub enum Controls {
     SetGameStatus {
         /// Stable game ID.
         id: String,
-        /// Whether ReShade is now installed.
+        /// Whether `ReShade` is now installed.
         installed: bool,
     },
 }
@@ -111,11 +111,7 @@ impl SimpleComponent for GameList {
         }
     }
 
-    fn init(
-        games: Vec<Game>,
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    fn init(games: Vec<Game>, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let has_manual = games.iter().any(|g| matches!(g.source, GameSource::Manual));
         let mut model = Self {
             games: games.clone(),
@@ -167,7 +163,7 @@ impl SimpleComponent for GameList {
                 }
                 self.games.push(game);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
-            }
+            },
             Controls::RemoveGame(id) => {
                 if let Some(row) = self.manual_rows.remove(&id) {
                     self.manual_list_box.remove(&row);
@@ -176,19 +172,13 @@ impl SimpleComponent for GameList {
                 }
                 self.games.retain(|g| g.id != id);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
-            }
+            },
             Controls::SetGameStatus { id, installed } => {
-                let subtitle = if installed {
-                    fl!("reshade-installed")
-                } else {
-                    fl!("not-installed")
-                };
-                if let Some(row) =
-                    self.auto_rows.get(&id).or_else(|| self.manual_rows.get(&id))
-                {
+                let subtitle = if installed { fl!("reshade-installed") } else { fl!("not-installed") };
+                if let Some(row) = self.auto_rows.get(&id).or_else(|| self.manual_rows.get(&id)) {
                     row.set_subtitle(&subtitle);
                 }
-            }
+            },
         }
     }
 }
@@ -200,11 +190,7 @@ fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> adw::Actio
     let row = adw::ActionRow::new();
     row.set_widget_name(&game.id);
     row.set_title(&game.name);
-    let subtitle = if game.status.is_installed() {
-        String::from("ReShade installed")
-    } else {
-        fl!("not-installed")
-    };
+    let subtitle = if game.status.is_installed() { String::from("ReShade installed") } else { fl!("not-installed") };
     row.set_subtitle(&subtitle);
     row.set_activatable(true);
 

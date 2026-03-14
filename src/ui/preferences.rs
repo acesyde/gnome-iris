@@ -1,4 +1,5 @@
 //! Global preferences page — shader repos, update interval, INI toggle.
+#![allow(clippy::cast_precision_loss)]
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -11,12 +12,13 @@ use crate::reshade::config::GlobalConfig;
 use crate::ui::install_version_dialog;
 
 /// Initialization payload for [`Preferences`].
+#[allow(clippy::module_name_repetitions)]
 pub struct PreferencesInit {
     /// App data directory (e.g. `~/.local/share/iris/`).
     pub data_dir: PathBuf,
     /// Current global configuration.
     pub config: GlobalConfig,
-    /// All locally installed ReShade version directories.
+    /// All locally installed `ReShade` version directories.
     pub installed_versions: Vec<String>,
     /// The currently active version (from `LVERS`), if any.
     pub current_version: Option<String>,
@@ -167,19 +169,14 @@ impl SimpleComponent for Preferences {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn init(
-        init: PreferencesInit,
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    #[allow(clippy::too_many_lines)]
+    fn init(init: PreferencesInit, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         // Build the dialog component early so it can be stored in the model.
         let install_version_dialog =
             install_version_dialog::InstallVersionDialog::builder()
                 .launch(())
                 .forward(sender.input_sender(), |sig| match sig {
-                    install_version_dialog::Signal::InstallRequested(key) => {
-                        Controls::InstallLatestVersion(key)
-                    }
+                    install_version_dialog::Signal::InstallRequested(key) => Controls::InstallLatestVersion(key),
                 });
 
         let model = Self {
@@ -223,10 +220,7 @@ impl SimpleComponent for Preferences {
             open_btn.set_tooltip_text(Some(&fl!("open-reshade-folder")));
             open_btn.connect_clicked(move |_| {
                 let _ = std::fs::create_dir_all(&reshade_dir);
-                std::process::Command::new("xdg-open")
-                    .arg(reshade_dir.as_os_str())
-                    .spawn()
-                    .ok();
+                std::process::Command::new("xdg-open").arg(reshade_dir.as_os_str()).spawn().ok();
             });
 
             let add_version_btn = gtk::Button::from_icon_name("list-add-symbolic");
@@ -247,33 +241,28 @@ impl SimpleComponent for Preferences {
         }
 
         // Populate installed versions rows imperatively (runtime data, can't use view! macro).
-        let (version_rows, version_buttons, version_spinners, placeholder_row) =
-            if model.installed_versions.is_empty() {
-                let row = adw::ActionRow::new();
-                row.set_title(&fl!("no-versions-installed"));
-                row.set_subtitle(&fl!("no-versions-subtitle"));
+        let (version_rows, version_buttons, version_spinners, placeholder_row) = if model.installed_versions.is_empty()
+        {
+            let row = adw::ActionRow::new();
+            row.set_title(&fl!("no-versions-installed"));
+            row.set_subtitle(&fl!("no-versions-subtitle"));
+            widgets.versions_group.add(&row);
+            (HashMap::new(), HashMap::new(), HashMap::new(), Some(row))
+        } else {
+            let mut rows = HashMap::new();
+            let mut buttons = HashMap::new();
+            let mut spinners = HashMap::new();
+            for version in &model.installed_versions {
+                let sub = subtitle_for_installed(version, model.current_version.as_deref(), false);
+                let is_in_use = model.versions_in_use.contains(version);
+                let (row, btn, spinner) = build_installed_row(version, &sub, is_in_use, &sender);
                 widgets.versions_group.add(&row);
-                (HashMap::new(), HashMap::new(), HashMap::new(), Some(row))
-            } else {
-                let mut rows = HashMap::new();
-                let mut buttons = HashMap::new();
-                let mut spinners = HashMap::new();
-                for version in &model.installed_versions {
-                    let sub = subtitle_for_installed(
-                        version,
-                        model.current_version.as_deref(),
-                        false,
-                    );
-                    let is_in_use = model.versions_in_use.contains(version);
-                    let (row, btn, spinner) =
-                        build_installed_row(version, &sub, is_in_use, &sender);
-                    widgets.versions_group.add(&row);
-                    rows.insert(version.clone(), row);
-                    buttons.insert(version.clone(), btn);
-                    spinners.insert(version.clone(), spinner);
-                }
-                (rows, buttons, spinners, None)
-            };
+                rows.insert(version.clone(), row);
+                buttons.insert(version.clone(), btn);
+                spinners.insert(version.clone(), spinner);
+            }
+            (rows, buttons, spinners, None)
+        };
 
         // Rebuild model with actual widget references needed for dynamic updates.
         let model = Self {
@@ -295,17 +284,18 @@ impl SimpleComponent for Preferences {
         ComponentParts { model, widgets }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn update(&mut self, msg: Controls, sender: ComponentSender<Self>) {
         match msg {
             Controls::SetConfig(config) => {
                 self.config = config;
-            }
+            },
             Controls::MergeShadersChanged(val) => {
                 if self.config.merge_shaders != val {
                     self.config.merge_shaders = val;
                     sender.output(Signal::ConfigChanged(self.config.clone())).ok();
                 }
-            }
+            },
             Controls::UpdateIntervalChanged(val) => {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let hours = val as u64;
@@ -313,7 +303,7 @@ impl SimpleComponent for Preferences {
                     self.config.update_interval_hours = hours;
                     sender.output(Signal::ConfigChanged(self.config.clone())).ok();
                 }
-            }
+            },
             Controls::SetLatestVersion(version) => {
                 self.latest_version = Some(version.clone());
                 let addon_key = format!("{version}-Addon");
@@ -325,11 +315,7 @@ impl SimpleComponent for Preferences {
 
                 // Standard variant.
                 if let Some(row) = self.version_rows.get(&version) {
-                    let sub = subtitle_for_installed(
-                        &version,
-                        self.current_version.as_deref(),
-                        true,
-                    );
+                    let sub = subtitle_for_installed(&version, self.current_version.as_deref(), true);
                     row.set_subtitle(&sub);
                 } else if self.latest_uninstalled_row.is_none() {
                     let (row, btn, spinner) = build_uninstalled_row(&version, &sender);
@@ -341,11 +327,7 @@ impl SimpleComponent for Preferences {
 
                 // Addon Support variant.
                 if let Some(row) = self.version_rows.get(&addon_key) {
-                    let sub = subtitle_for_installed(
-                        &addon_key,
-                        self.current_version.as_deref(),
-                        true,
-                    );
+                    let sub = subtitle_for_installed(&addon_key, self.current_version.as_deref(), true);
                     row.set_subtitle(&sub);
                 } else if self.latest_addon_uninstalled_row.is_none() {
                     let (row, btn, spinner) = build_uninstalled_row(&addon_key, &sender);
@@ -354,33 +336,27 @@ impl SimpleComponent for Preferences {
                     self.install_addon_button = Some(btn);
                     self.install_addon_spinner = Some(spinner);
                 }
-            }
+            },
             Controls::OpenInstallVersionDialog => {
-                self.install_version_dialog.emit(
-                    install_version_dialog::Controls::UpdateInstalledVersions(
-                        self.installed_versions.clone(),
-                    ),
-                );
                 self.install_version_dialog
-                    .emit(install_version_dialog::Controls::Reset);
+                    .emit(install_version_dialog::Controls::UpdateInstalledVersions(self.installed_versions.clone()));
+                self.install_version_dialog.emit(install_version_dialog::Controls::Reset);
                 if let Some(root) = self.versions_group.root() {
                     self.install_version_dialog.widget().present(Some(&root));
                 }
-            }
+            },
             Controls::InstallLatestVersion(version_key) => {
                 if self.active_ops.contains(&version_key) {
                     return;
                 }
                 self.active_ops.insert(version_key.clone());
                 if version_key.ends_with("-Addon") {
-                    begin_install_op(&self.install_addon_button, &self.install_addon_spinner);
+                    begin_install_op(self.install_addon_button.as_ref(), self.install_addon_spinner.as_ref());
                 } else {
-                    begin_install_op(&self.install_button, &self.install_spinner);
+                    begin_install_op(self.install_button.as_ref(), self.install_spinner.as_ref());
                 }
-                sender
-                    .output(Signal::InstallVersionRequested(version_key))
-                    .ok();
-            }
+                sender.output(Signal::InstallVersionRequested(version_key)).ok();
+            },
             Controls::RemoveVersion(version) => {
                 if self.active_ops.contains(&version) {
                     return;
@@ -388,7 +364,7 @@ impl SimpleComponent for Preferences {
                 self.active_ops.insert(version.clone());
                 begin_version_op(&version, &self.version_buttons, &self.version_spinners);
                 sender.output(Signal::RemoveVersionRequested(version)).ok();
-            }
+            },
             Controls::VersionDownloadComplete(version_key) => {
                 let is_addon = version_key.ends_with("-Addon");
 
@@ -396,22 +372,17 @@ impl SimpleComponent for Preferences {
                 // only if the version just downloaded IS the latest (custom installs must not
                 // disturb the uninstalled row for a different latest version).
                 if is_addon {
-                    finish_install_op(&self.install_addon_button, &self.install_addon_spinner);
-                    let is_latest_addon = self
-                        .latest_version
-                        .as_ref()
-                        .is_some_and(|l| format!("{l}-Addon") == version_key);
-                    if is_latest_addon
-                        && let Some(old) = self.latest_addon_uninstalled_row.take()
-                    {
+                    finish_install_op(self.install_addon_button.as_ref(), self.install_addon_spinner.as_ref());
+                    let is_latest_addon =
+                        self.latest_version.as_ref().is_some_and(|l| format!("{l}-Addon") == version_key);
+                    if is_latest_addon && let Some(old) = self.latest_addon_uninstalled_row.take() {
                         self.versions_group.remove(&old);
                         self.install_addon_button = None;
                         self.install_addon_spinner = None;
                     }
                 } else {
-                    finish_install_op(&self.install_button, &self.install_spinner);
-                    let is_latest =
-                        self.latest_version.as_deref() == Some(version_key.as_str());
+                    finish_install_op(self.install_button.as_ref(), self.install_spinner.as_ref());
+                    let is_latest = self.latest_version.as_deref() == Some(version_key.as_str());
                     if is_latest && let Some(old) = self.latest_uninstalled_row.take() {
                         self.versions_group.remove(&old);
                         self.install_button = None;
@@ -425,30 +396,19 @@ impl SimpleComponent for Preferences {
                 }
 
                 let is_latest = self.latest_version.as_deref() == Some(version_key.as_str())
-                    || self
-                        .latest_version
-                        .as_ref()
-                        .is_some_and(|l| format!("{l}-Addon") == version_key);
-                let sub = subtitle_for_installed(
-                    &version_key,
-                    self.current_version.as_deref(),
-                    is_latest,
-                );
+                    || self.latest_version.as_ref().is_some_and(|l| format!("{l}-Addon") == version_key);
+                let sub = subtitle_for_installed(&version_key, self.current_version.as_deref(), is_latest);
                 let is_in_use = self.versions_in_use.contains(&version_key);
-                let (row, btn, spinner) =
-                    build_installed_row(&version_key, &sub, is_in_use, &sender);
+                let (row, btn, spinner) = build_installed_row(&version_key, &sub, is_in_use, &sender);
                 self.versions_group.add(&row);
                 self.version_rows.insert(version_key.clone(), row);
                 self.version_buttons.insert(version_key.clone(), btn);
                 self.version_spinners.insert(version_key.clone(), spinner);
                 self.installed_versions.push(version_key.clone());
-                self.install_version_dialog.emit(
-                    install_version_dialog::Controls::UpdateInstalledVersions(
-                        self.installed_versions.clone(),
-                    ),
-                );
+                self.install_version_dialog
+                    .emit(install_version_dialog::Controls::UpdateInstalledVersions(self.installed_versions.clone()));
                 self.active_ops.remove(&version_key);
-            }
+            },
             Controls::VersionRemoveComplete(version) => {
                 finish_version_op(&version, &self.version_buttons, &self.version_spinners);
                 if let Some(row) = self.version_rows.remove(&version) {
@@ -457,11 +417,8 @@ impl SimpleComponent for Preferences {
                 self.version_buttons.remove(&version);
                 self.version_spinners.remove(&version);
                 self.installed_versions.retain(|v| v != &version);
-                self.install_version_dialog.emit(
-                    install_version_dialog::Controls::UpdateInstalledVersions(
-                        self.installed_versions.clone(),
-                    ),
-                );
+                self.install_version_dialog
+                    .emit(install_version_dialog::Controls::UpdateInstalledVersions(self.installed_versions.clone()));
 
                 // Restore the "latest not installed" row for the variant just removed,
                 // but only if the latest version is not already present in the installed list.
@@ -496,7 +453,7 @@ impl SimpleComponent for Preferences {
                     self.placeholder_row = Some(ph);
                 }
                 self.active_ops.remove(&version);
-            }
+            },
             Controls::VersionOpError(e) => {
                 log::error!("Version operation failed: {e}");
                 self.active_ops.clear();
@@ -504,20 +461,18 @@ impl SimpleComponent for Preferences {
                 for v in &versions {
                     finish_version_op(v, &self.version_buttons, &self.version_spinners);
                 }
-                finish_install_op(&self.install_button, &self.install_spinner);
-                finish_install_op(&self.install_addon_button, &self.install_addon_spinner);
-            }
+                finish_install_op(self.install_button.as_ref(), self.install_spinner.as_ref());
+                finish_install_op(self.install_addon_button.as_ref(), self.install_addon_spinner.as_ref());
+            },
         }
     }
 }
 
 /// Format a version key for display: `"6.7.3-Addon"` → `"6.7.3 — Addon Support"`.
 fn display_title(version_key: &str) -> String {
-    if let Some(base) = version_key.strip_suffix("-Addon") {
-        format!("{base} — {}", fl!("addon-support"))
-    } else {
-        version_key.to_owned()
-    }
+    version_key
+        .strip_suffix("-Addon")
+        .map_or_else(|| version_key.to_owned(), |base| format!("{base} — {}", fl!("addon-support")))
 }
 
 /// Build a "latest available — not installed" row with a download button/spinner stack.
@@ -582,11 +537,7 @@ fn build_installed_row(
     btn.set_valign(gtk::Align::Center);
     btn.add_css_class("flat");
     btn.set_sensitive(!is_in_use);
-    let tip = if is_in_use {
-        fl!("version-in-use")
-    } else {
-        fl!("remove-version")
-    };
+    let tip = if is_in_use { fl!("version-in-use") } else { fl!("remove-version") };
     btn.set_tooltip_text(Some(&tip));
     {
         let v = version.to_owned();
@@ -607,31 +558,23 @@ fn build_installed_row(
 }
 
 /// Show spinner in place of remove button — call before emitting `RemoveVersionRequested`.
-fn begin_version_op(
-    version: &str,
-    buttons: &HashMap<String, gtk::Button>,
-    spinners: &HashMap<String, gtk::Spinner>,
-) {
+fn begin_version_op(version: &str, buttons: &HashMap<String, gtk::Button>, spinners: &HashMap<String, gtk::Spinner>) {
     if let Some(sp) = spinners.get(version) {
         sp.start();
     }
-    if let Some(btn) = buttons.get(version) {
-        if let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok()) {
-            stack.set_visible_child_name("spinner");
-        }
+    if let Some(btn) = buttons.get(version)
+        && let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok())
+    {
+        stack.set_visible_child_name("spinner");
     }
 }
 
 /// Restore remove button in place of spinner — call after the operation completes.
-fn finish_version_op(
-    version: &str,
-    buttons: &HashMap<String, gtk::Button>,
-    spinners: &HashMap<String, gtk::Spinner>,
-) {
-    if let Some(btn) = buttons.get(version) {
-        if let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok()) {
-            stack.set_visible_child_name("button");
-        }
+fn finish_version_op(version: &str, buttons: &HashMap<String, gtk::Button>, spinners: &HashMap<String, gtk::Spinner>) {
+    if let Some(btn) = buttons.get(version)
+        && let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok())
+    {
+        stack.set_visible_child_name("button");
     }
     if let Some(sp) = spinners.get(version) {
         sp.stop();
@@ -639,23 +582,23 @@ fn finish_version_op(
 }
 
 /// Show spinner in place of the install button for the "latest not installed" row.
-fn begin_install_op(button: &Option<gtk::Button>, spinner: &Option<gtk::Spinner>) {
+fn begin_install_op(button: Option<&gtk::Button>, spinner: Option<&gtk::Spinner>) {
     if let Some(sp) = spinner {
         sp.start();
     }
-    if let Some(btn) = button {
-        if let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok()) {
-            stack.set_visible_child_name("spinner");
-        }
+    if let Some(btn) = button
+        && let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok())
+    {
+        stack.set_visible_child_name("spinner");
     }
 }
 
 /// Restore the install button in place of the spinner.
-fn finish_install_op(button: &Option<gtk::Button>, spinner: &Option<gtk::Spinner>) {
-    if let Some(btn) = button {
-        if let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok()) {
-            stack.set_visible_child_name("button");
-        }
+fn finish_install_op(button: Option<&gtk::Button>, spinner: Option<&gtk::Spinner>) {
+    if let Some(btn) = button
+        && let Some(stack) = btn.parent().and_then(|p| p.downcast::<gtk::Stack>().ok())
+    {
+        stack.set_visible_child_name("button");
     }
     if let Some(sp) = spinner {
         sp.stop();

@@ -1,14 +1,14 @@
-//! Update tracking — stores ReShade version state in a single JSON file.
+//! Update tracking — stores `ReShade` version state in a single JSON file.
 
 use std::path::PathBuf;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
-/// Persisted version and update state for ReShade.
+/// Persisted version and update state for `ReShade`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VersionState {
-    /// Latest known ReShade version string, e.g. `"6.1.0"`.
+    /// Latest known `ReShade` version string, e.g. `"6.1.0"`.
     pub latest: Option<String>,
     /// Unix timestamp (seconds) of the last GitHub API check.
     pub last_checked: Option<u64>,
@@ -24,24 +24,19 @@ fn parse_version_key(s: &str) -> ((u64, u64, u64), bool) {
     let addon = s.ends_with("-Addon");
     let base = s.strip_suffix("-Addon").unwrap_or(s);
     let mut parts = base.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
-    (
-        (
-            parts.next().unwrap_or(0),
-            parts.next().unwrap_or(0),
-            parts.next().unwrap_or(0),
-        ),
-        addon,
-    )
+    ((parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0)), addon)
 }
 
 /// Manages the `reshade_state.json` file under the iris data directory.
+#[allow(clippy::module_name_repetitions)]
 pub struct UpdateCache {
     base: PathBuf,
 }
 
 impl UpdateCache {
     /// Creates a new cache pointing at the given directory.
-    pub fn new(base: PathBuf) -> Self {
+    #[must_use]
+    pub const fn new(base: PathBuf) -> Self {
         Self { base }
     }
 
@@ -65,12 +60,18 @@ impl UpdateCache {
         Ok(())
     }
 
-    /// Returns the last recorded ReShade version, or `None` if unknown.
+    /// Returns the last recorded `ReShade` version, or `None` if unknown.
+    ///
+    /// # Errors
+    /// Returns an error if the cache file cannot be read or parsed.
     pub fn read_version(&self) -> Result<Option<String>> {
         Ok(self.read_state()?.latest)
     }
 
-    /// Writes the current ReShade version to disk.
+    /// Writes the current `ReShade` version to disk.
+    ///
+    /// # Errors
+    /// Returns an error if the cache file cannot be written.
     pub fn write_version(&self, version: &str) -> Result<()> {
         let mut state = self.read_state()?;
         state.latest = Some(version.to_owned());
@@ -78,17 +79,17 @@ impl UpdateCache {
     }
 
     /// Updates the last-checked timestamp to now.
+    ///
+    /// # Errors
+    /// Returns an error if the cache file cannot be written.
     pub fn touch(&self) -> Result<()> {
         let mut state = self.read_state()?;
-        state.last_checked = Some(
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)?
-                .as_secs(),
-        );
+        state.last_checked = Some(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs());
         self.write_state(&state)
     }
 
     /// Returns `true` if more than `interval_hours` have passed since the last update.
+    #[must_use]
     pub fn needs_update(&self, interval_hours: u64) -> bool {
         let Ok(state) = self.read_state() else {
             return true;
@@ -104,18 +105,22 @@ impl UpdateCache {
     }
 
     /// Records a newly installed version, keeping the list sorted.
+    ///
+    /// # Errors
+    /// Returns an error if the cache file cannot be read or written.
     pub fn add_installed(&self, version: &str) -> Result<()> {
         let mut state = self.read_state()?;
         if !state.installed.contains(&version.to_owned()) {
             state.installed.push(version.to_owned());
-            state
-                .installed
-                .sort_by(|a, b| parse_version_key(a).cmp(&parse_version_key(b)));
+            state.installed.sort_by_key(|a| parse_version_key(a));
         }
         self.write_state(&state)
     }
 
     /// Removes a version from the installed list.
+    ///
+    /// # Errors
+    /// Returns an error if the cache file cannot be read or written.
     pub fn remove_installed(&self, version: &str) -> Result<()> {
         let mut state = self.read_state()?;
         state.installed.retain(|v| v != version);
@@ -123,6 +128,9 @@ impl UpdateCache {
     }
 
     /// Returns the list of locally installed versions.
+    ///
+    /// # Errors
+    /// Returns an error if the cache file cannot be read or parsed.
     pub fn read_installed(&self) -> Result<Vec<String>> {
         Ok(self.read_state()?.installed)
     }
@@ -181,10 +189,7 @@ mod tests {
         cache.add_installed("6.7.3-Addon").unwrap();
         cache.add_installed("6.7.3").unwrap();
         cache.add_installed("6.8.0").unwrap();
-        assert_eq!(
-            cache.read_installed().unwrap(),
-            vec!["6.7.3", "6.7.3-Addon", "6.8.0"]
-        );
+        assert_eq!(cache.read_installed().unwrap(), vec!["6.7.3", "6.7.3-Addon", "6.8.0"]);
     }
 
     #[test]
@@ -214,8 +219,7 @@ mod tests {
         cache.touch().unwrap();
         cache.add_installed("6.1.0").unwrap();
 
-        let state_json =
-            std::fs::read_to_string(dir.path().join("reshade_state.json")).unwrap();
+        let state_json = std::fs::read_to_string(dir.path().join("reshade_state.json")).unwrap();
         assert!(state_json.contains("\"latest\""));
         assert!(state_json.contains("\"last_checked\""));
         assert!(state_json.contains("\"installed\""));

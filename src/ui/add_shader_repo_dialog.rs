@@ -92,11 +92,7 @@ impl SimpleComponent for AddShaderRepoDialog {
         }
     }
 
-    fn init(
-        _: (),
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let mut model = Self {
             name: String::new(),
             url: String::new(),
@@ -127,17 +123,14 @@ impl SimpleComponent for AddShaderRepoDialog {
             let s = sender.clone();
             move |e| s.input(Controls::SetRef(e.text().to_string()))
         });
-        widgets.confirm_btn.connect_clicked({
-            let s = sender.clone();
-            move |_| s.input(Controls::Confirm)
-        });
+        widgets.confirm_btn.connect_clicked(move |_| sender.input(Controls::Confirm));
 
         ComponentParts { model, widgets }
     }
 
     fn update(&mut self, msg: Controls, sender: ComponentSender<Self>) {
         match msg {
-            Controls::Open => {}
+            Controls::Open => {},
             Controls::SetName(v) => self.name = v,
             Controls::SetUrl(v) => self.url = v,
             Controls::SetRef(v) => self.git_ref = v,
@@ -166,7 +159,7 @@ impl SimpleComponent for AddShaderRepoDialog {
                 self.url_entry.set_text("");
                 self.ref_entry.set_text("");
                 self.dialog.close();
-            }
+            },
         }
     }
 }

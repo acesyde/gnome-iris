@@ -10,11 +10,14 @@ use crate::reshade::config::ShaderRepo;
 ///
 /// If the local directory does not exist, it is cloned from `repo.url`.
 /// If it does exist, a fast-forward pull is attempted.
+///
+/// # Errors
+/// Returns an error if cloning or fetching fails.
 pub fn sync_repo(repo: &ShaderRepo, repos_dir: &Path) -> Result<()> {
     let dest = repos_dir.join(&repo.local_name);
     if dest.exists() {
-        let git_repo = git2::Repository::open(&dest)
-            .with_context(|| format!("Cannot open repo at {}", dest.display()))?;
+        let git_repo =
+            git2::Repository::open(&dest).with_context(|| format!("Cannot open repo at {}", dest.display()))?;
         fetch_and_merge(&git_repo)?;
     } else {
         let mut opts = git2::FetchOptions::new();
@@ -24,9 +27,7 @@ pub fn sync_repo(repo: &ShaderRepo, repos_dir: &Path) -> Result<()> {
         if let Some(branch) = &repo.branch {
             builder.branch(branch);
         }
-        builder
-            .clone(&repo.url, &dest)
-            .with_context(|| format!("Failed to clone {}", repo.url))?;
+        builder.clone(&repo.url, &dest).with_context(|| format!("Failed to clone {}", repo.url))?;
     }
     Ok(())
 }
@@ -52,6 +53,9 @@ fn fetch_and_merge(repo: &git2::Repository) -> Result<()> {
 /// Rebuilds the `Merged/` directory by symlinking all unique shader/texture files.
 ///
 /// Priority is determined by order in `repos`: first repo wins on name collision.
+///
+/// # Errors
+/// Returns an error if directory creation or symlinking fails.
 pub fn rebuild_merged(repos_dir: &Path, disabled_repos: &[String]) -> Result<()> {
     let merged_shaders = repos_dir.join("Merged/Shaders");
     let merged_textures = repos_dir.join("Merged/Textures");
@@ -83,11 +87,11 @@ pub fn rebuild_merged(repos_dir: &Path, disabled_repos: &[String]) -> Result<()>
 /// Creates symlinks in `dest_dir` for each file in `src_dir`.
 ///
 /// Skips files that already have a symlink in `dest_dir` (first-wins semantics).
+///
+/// # Errors
+/// Returns an error if reading the source directory or creating a symlink fails.
 pub fn link_shader_files(src_dir: &Path, dest_dir: &Path) -> Result<()> {
-    for entry in std::fs::read_dir(src_dir)
-        .context("Cannot read shader dir")?
-        .flatten()
-    {
+    for entry in std::fs::read_dir(src_dir).context("Cannot read shader dir")?.flatten() {
         let src = entry.path();
         if !src.is_file() {
             continue;
@@ -104,11 +108,13 @@ pub fn link_shader_files(src_dir: &Path, dest_dir: &Path) -> Result<()> {
 }
 
 /// Returns the path to the merged shaders directory.
+#[must_use]
 pub fn merged_shaders_dir(base: &Path) -> PathBuf {
     base.join("ReShade_shaders/Merged/Shaders")
 }
 
 /// Returns the path to the merged textures directory.
+#[must_use]
 pub fn merged_textures_dir(base: &Path) -> PathBuf {
     base.join("ReShade_shaders/Merged/Textures")
 }
@@ -151,11 +157,7 @@ mod tests {
 
         // Should still point to src1 version (first wins)
         let target = std::fs::read_link(merged.join("common.fx")).unwrap();
-        assert!(
-            target.to_string_lossy().contains("repo1"),
-            "expected repo1, got: {}",
-            target.display()
-        );
+        assert!(target.to_string_lossy().contains("repo1"), "expected repo1, got: {}", target.display());
     }
 
     #[test]

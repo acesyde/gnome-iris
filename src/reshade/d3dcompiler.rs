@@ -21,10 +21,7 @@ struct Assets;
 /// `d3dcompiler_47.dll.32` or `d3dcompiler_47.dll.64`.
 #[must_use]
 pub fn dll_path(data_dir: &Path, arch: ExeArch) -> PathBuf {
-    data_dir.join(format!(
-        "d3dcompiler_47.dll.{}",
-        arch.d3dcompiler_suffix()
-    ))
+    data_dir.join(format!("d3dcompiler_47.dll.{}", arch.d3dcompiler_suffix()))
 }
 
 /// Returns `true` if the DLL for `arch` already exists in `data_dir`.
@@ -46,12 +43,10 @@ pub fn ensure(data_dir: &Path, arch: ExeArch) -> Result<bool> {
         return Ok(false);
     }
     let asset_name = format!("d3dcompiler_47.dll.{}", arch.d3dcompiler_suffix());
-    let asset = Assets::get(&asset_name)
-        .ok_or_else(|| anyhow::anyhow!("Embedded asset '{asset_name}' not found"))?;
+    let asset = Assets::get(&asset_name).ok_or_else(|| anyhow::anyhow!("Embedded asset '{asset_name}' not found"))?;
     std::fs::create_dir_all(data_dir).context("Cannot create data directory")?;
     let dest = dll_path(data_dir, arch);
-    std::fs::write(&dest, asset.data)
-        .with_context(|| format!("Cannot write {}", dest.display()))?;
+    std::fs::write(&dest, asset.data).with_context(|| format!("Cannot write {}", dest.display()))?;
     log::info!("Installed {} to {}", asset_name, dest.display());
     Ok(true)
 }

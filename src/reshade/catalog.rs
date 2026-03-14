@@ -1,9 +1,10 @@
-//! Curated list of known ReShade shader repositories.
+//! Curated list of known `ReShade` shader repositories.
 
 use crate::reshade::config::ShaderRepo;
 
 /// A known shader repository from the community catalog.
 #[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct CatalogEntry {
     /// Display name shown in the Shaders tab.
     pub name: &'static str,

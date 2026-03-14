@@ -7,27 +7,31 @@ use anyhow::{Context, Result};
 use crate::reshade::game::{ExeArch, Game, GameSource};
 
 /// Returns all Steam library root paths found on this system.
+///
+/// # Errors
+/// Returns an error if Steam is not found or the VDF file cannot be read.
 pub fn find_steam_libraries() -> Result<Vec<PathBuf>> {
     let steam_root = steam_root().context("Steam not found")?;
     let vdf_path = steam_root.join("steamapps/libraryfolders.vdf");
-    let vdf_str = std::fs::read_to_string(&vdf_path)
-        .with_context(|| format!("Cannot read {}", vdf_path.display()))?;
+    let vdf_str = std::fs::read_to_string(&vdf_path).with_context(|| format!("Cannot read {}", vdf_path.display()))?;
     parse_library_folders_vdf(&vdf_str)
 }
 
 /// Parses the `libraryfolders.vdf` content and returns library root paths.
+///
+/// # Errors
+/// Returns an error if the VDF content is invalid.
 pub fn parse_library_folders_vdf(vdf_str: &str) -> Result<Vec<PathBuf>> {
     let vdf = keyvalues_parser::parse(vdf_str).context("Invalid VDF")?;
     let root = vdf.value.get_obj().context("VDF root is not an object")?;
     let mut paths = Vec::new();
     for (_key, values) in root.iter() {
         for value in values {
-            if let Some(obj) = value.get_obj() {
-                if let Some(path_values) = obj.get("path") {
-                    if let Some(v) = path_values.first().and_then(|v| v.get_str()) {
-                        paths.push(PathBuf::from(v));
-                    }
-                }
+            if let Some(obj) = value.get_obj()
+                && let Some(path_values) = obj.get("path")
+                && let Some(v) = path_values.first().and_then(|v| v.get_str())
+            {
+                paths.push(PathBuf::from(v));
             }
         }
     }
@@ -37,7 +41,8 @@ pub fn parse_library_folders_vdf(vdf_str: &str) -> Result<Vec<PathBuf>> {
 /// Scans all Steam libraries and returns discovered games.
 ///
 /// Only entries whose `appmanifest_*.acf` declares `type = "Game"` are included,
-/// which filters out Proton runtimes, SteamLinuxRuntime, and other tools.
+/// which filters out Proton runtimes, `SteamLinuxRuntime`, and other tools.
+#[must_use]
 pub fn discover_steam_games() -> Vec<Game> {
     let Ok(libraries) = find_steam_libraries() else {
         return vec![];
@@ -76,7 +81,7 @@ fn parse_appmanifest(acf_path: &Path, steamapps: &Path) -> Option<Game> {
         obj.get(key)
             .and_then(|vs| vs.first())
             .and_then(|v| v.get_str())
-            .map(|s| s.to_owned())
+            .map(std::borrow::ToOwned::to_owned)
     };
 
     let name = get("name")?;
@@ -97,21 +102,20 @@ fn parse_appmanifest(acf_path: &Path, steamapps: &Path) -> Option<Game> {
     Some(Game::new(name, path, GameSource::Steam { app_id }))
 }
 
-/// Returns the directory where ReShade DLLs should be placed for a game.
+/// Returns the directory where `ReShade` DLLs should be placed for a game.
 ///
 /// Many games ship their main executable in an architecture-named subdirectory
 /// (e.g. `bin/win_x64`, `bin/x64`, `Binaries/Win64`). This function detects
 /// that layout and returns the subdirectory; otherwise it returns `base` unchanged.
 fn find_exe_dir(base: &Path) -> PathBuf {
     // Path components that indicate an architecture-specific exe subdirectory.
-    const ARCH_HINTS: &[&str] = &[
-        "win_x64", "win_x86", "win64", "win32", "winx64", "winx86", "x64", "x86_64", "x86",
-        "binaries",
-    ];
+    const ARCH_HINTS: &[&str] =
+        &["win_x64", "win_x86", "win64", "win32", "winx64", "winx86", "x64", "x86_64", "x86", "binaries"];
 
-    // Walk up to 4 levels deep and collect (parent_dir, exe_size) pairs for
+    // Walk up to 4 levels deep and find (parent_dir, exe_size) pairs for
     // every .exe whose relative path contains an architecture hint component.
-    let candidates: Vec<(PathBuf, u64)> = walk_exes(base, 4)
+    // Pick the directory containing the largest arch-hinted exe (largest = main binary).
+    walk_exes(base, 4)
         .into_iter()
         .filter_map(|exe| {
             let rel = exe.strip_prefix(base).ok()?;
@@ -126,14 +130,8 @@ fn find_exe_dir(base: &Path) -> PathBuf {
                 None
             }
         })
-        .collect();
-
-    // Pick the directory containing the largest arch-hinted exe (largest = main binary).
-    candidates
-        .into_iter()
         .max_by_key(|(_, size)| *size)
-        .map(|(dir, _)| dir)
-        .unwrap_or_else(|| base.to_path_buf())
+        .map_or_else(|| base.to_path_buf(), |(dir, _)| dir)
 }
 
 /// Recursively collects `.exe` paths under `dir`, limited to `max_depth` levels.
@@ -149,11 +147,7 @@ fn walk_exes(dir: &Path, max_depth: usize) -> Vec<PathBuf> {
         let path = entry.path();
         if path.is_dir() {
             exes.extend(walk_exes(&path, max_depth - 1));
-        } else if path
-            .extension()
-            .map(|e| e.eq_ignore_ascii_case("exe"))
-            .unwrap_or(false)
-        {
+        } else if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("exe")) {
             exes.push(path);
         }
     }
@@ -174,6 +168,7 @@ fn is_steam_tool(name: &str, install_dir: &str) -> bool {
 /// Detects the architecture of a PE `.exe` by reading its header bytes.
 ///
 /// Returns `None` if the file cannot be read or is not a valid PE.
+#[must_use]
 pub fn detect_exe_arch(exe_path: &Path) -> Option<ExeArch> {
     use std::io::Read;
     let mut file = std::fs::File::open(exe_path).ok()?;
@@ -203,11 +198,8 @@ pub fn detect_exe_arch(exe_path: &Path) -> Option<ExeArch> {
 
 fn steam_root() -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
-    let candidates = [
-        format!("{home}/.local/share/Steam"),
-        format!("{home}/.steam/steam"),
-        format!("{home}/.steam/root"),
-    ];
+    let candidates =
+        [format!("{home}/.local/share/Steam"), format!("{home}/.steam/steam"), format!("{home}/.steam/root")];
     candidates.into_iter().map(PathBuf::from).find(|p| p.exists())
 }
 

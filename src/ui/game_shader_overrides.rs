@@ -1,7 +1,7 @@
 //! Per-game shader repository override panel.
 
 use relm4::gtk::prelude::*;
-use relm4::{ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, gtk};
+use relm4::{ComponentParts, ComponentSender, SimpleComponent, gtk};
 
 use crate::reshade::config::{GlobalConfig, ShaderOverrides};
 
@@ -42,7 +42,7 @@ impl SimpleComponent for GameShaderOverrides {
 
     fn init(
         (config, overrides): (GlobalConfig, ShaderOverrides),
-        _root: Self::Root,
+        root: Self::Root,
         _sender: ComponentSender<Self>,
     ) -> ComponentParts<Self> {
         let model = Self { overrides, config };
@@ -55,7 +55,7 @@ impl SimpleComponent for GameShaderOverrides {
             Controls::SetData(config, overrides) => {
                 self.config = config;
                 self.overrides = overrides;
-            }
+            },
         }
     }
 }

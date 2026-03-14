@@ -1,7 +1,9 @@
-//! Detail pane showing a single game's ReShade status and controls.
+//! Detail pane showing a single game's `ReShade` status and controls.
 
 use relm4::adw::prelude::*;
-use relm4::{Component, ComponentController, ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk};
+use relm4::{
+    Component, ComponentController, ComponentParts, ComponentSender, RelmWidgetExt, SimpleComponent, adw, gtk,
+};
 
 use crate::fl;
 use crate::reshade::config::{ShaderOverrides, ShaderRepo};
@@ -15,7 +17,7 @@ pub struct GameDetail {
     shader_repos: Vec<ShaderRepo>,
     reshade_version: Option<String>,
     shader_list: gtk::ListBox,
-    /// Locally-cached ReShade version keys (e.g. `"v6.3.0"`), set by Window.
+    /// Locally-cached `ReShade` version keys (e.g. `"v6.3.0"`), set by Window.
     installed_versions: Vec<String>,
     /// Dialog for picking which cached version to install.
     pick_version_dialog: relm4::Controller<pick_reshade_version_dialog::PickReshadeVersionDialog>,
@@ -49,7 +51,7 @@ pub enum Controls {
         repos: Vec<ShaderRepo>,
         /// Per-game shader overrides.
         overrides: ShaderOverrides,
-        /// Currently installed ReShade version string.
+        /// Currently installed `ReShade` version string.
         reshade_version: Option<String>,
     },
     /// Internal: install button clicked — `update()` reads `self.game`.
@@ -58,7 +60,7 @@ pub enum Controls {
     UninstallRequested,
     /// Internal: open-folder button clicked — opens the game directory.
     OpenFolderRequested,
-    /// Refresh the list of locally-cached ReShade versions available for install.
+    /// Refresh the list of locally-cached `ReShade` versions available for install.
     SetInstalledVersions(Vec<String>),
     /// Internal: version picker dialog confirmed a version choice.
     VersionChosen(String),
@@ -118,7 +120,7 @@ impl GameDetail {
                 };
                 let version = self.reshade_version.as_deref().unwrap_or("?");
                 format!("{arch_str} \u{00B7} {dll} \u{00B7} ReShade {version}")
-            }
+            },
         }
     }
 
@@ -130,11 +132,7 @@ impl GameDetail {
         if self.game.is_none() {
             return;
         }
-        let disabled = self
-            .game
-            .as_ref()
-            .map(|g| g.shader_overrides.disabled_repos.clone())
-            .unwrap_or_default();
+        let disabled = self.game.as_ref().map(|g| g.shader_overrides.disabled_repos.clone()).unwrap_or_default();
         for repo in &self.shader_repos {
             let row = adw::SwitchRow::new();
             row.set_title(&repo.local_name);
@@ -164,7 +162,7 @@ impl SimpleComponent for GameDetail {
     view! {
         adw::NavigationPage {
             #[watch]
-            set_title: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or("Game"),
+            set_title: model.game.as_ref().map_or("Game", |g| g.name.as_str()),
 
             #[wrap(Some)]
             set_child = &adw::ToolbarView {
@@ -207,7 +205,7 @@ impl SimpleComponent for GameDetail {
                                     add_css_class: "title-1",
                                     set_halign: gtk::Align::Center,
                                     #[watch]
-                                    set_label: model.game.as_ref().map(|g| g.name.as_str()).unwrap_or(""),
+                                    set_label: model.game.as_ref().map_or("", |g| g.name.as_str()),
                                 },
 
                                 gtk::Label {
@@ -249,11 +247,10 @@ impl SimpleComponent for GameDetail {
                                     set_visible: model
                                         .game
                                         .as_ref()
-                                        .map(|g| !g.status.is_installed())
-                                        .unwrap_or(true),
+                                        .is_none_or(|g| !g.status.is_installed()),
                                     #[watch]
                                     set_sensitive: !model.installed_versions.is_empty()
-                                        && model.game.as_ref().map(|g| !g.status.is_installed()).unwrap_or(true),
+                                        && model.game.as_ref().is_none_or(|g| !g.status.is_installed()),
                                     connect_clicked[sender] => move |_| {
                                         sender.input(Controls::InstallRequested);
                                     },
@@ -267,8 +264,7 @@ impl SimpleComponent for GameDetail {
                                     set_visible: model
                                         .game
                                         .as_ref()
-                                        .map(|g| g.status.is_installed())
-                                        .unwrap_or(false),
+                                        .is_some_and(|g| g.status.is_installed()),
                                     connect_clicked[sender] => move |_| {
                                         sender.input(Controls::UninstallRequested);
                                     },
@@ -313,19 +309,13 @@ impl SimpleComponent for GameDetail {
         }
     }
 
-    fn init(
-        _: (),
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
-        let pick_version_dialog =
-            pick_reshade_version_dialog::PickReshadeVersionDialog::builder()
-                .launch(())
-                .forward(sender.input_sender(), |sig| match sig {
-                    pick_reshade_version_dialog::Signal::VersionChosen(v) => {
-                        Controls::VersionChosen(v)
-                    }
-                });
+    fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
+        let pick_version_dialog = pick_reshade_version_dialog::PickReshadeVersionDialog::builder().launch(()).forward(
+            sender.input_sender(),
+            |sig| match sig {
+                pick_reshade_version_dialog::Signal::VersionChosen(v) => Controls::VersionChosen(v),
+            },
+        );
         let mut model = Self {
             game: None,
             progress_message: None,
@@ -346,7 +336,7 @@ impl SimpleComponent for GameDetail {
             Controls::SetGame(game) => {
                 self.game = Some(game);
                 self.rebuild_shader_rows(&sender);
-            }
+            },
             Controls::Clear => self.game = None,
             Controls::SetProgress(msg) => self.progress_message = Some(msg),
             Controls::ClearProgress => self.progress_message = None,
@@ -355,42 +345,43 @@ impl SimpleComponent for GameDetail {
                     game.status = InstallStatus::Installed { dll, arch };
                 }
                 self.reshade_version = Some(version);
-            }
+            },
             Controls::MarkUninstalled => {
                 if let Some(game) = &mut self.game {
                     game.status = InstallStatus::NotInstalled;
                 }
-            }
-            Controls::SetShaderData { repos, overrides, reshade_version } => {
+            },
+            Controls::SetShaderData {
+                repos,
+                overrides,
+                reshade_version,
+            } => {
                 self.shader_repos = repos;
                 self.reshade_version = reshade_version;
                 if let Some(game) = &mut self.game {
                     game.shader_overrides = overrides;
                 }
                 self.rebuild_shader_rows(&sender);
-            }
+            },
             Controls::InstallRequested => {
                 use relm4::gtk::prelude::WidgetExt;
                 if let Some(root) = self.shader_list.root() {
-                    self.pick_version_dialog.emit(
-                        pick_reshade_version_dialog::Controls::Open {
-                            versions: self.installed_versions.clone(),
-                            parent: root.upcast::<gtk::Widget>(),
-                        },
-                    );
+                    self.pick_version_dialog.emit(pick_reshade_version_dialog::Controls::Open {
+                        versions: self.installed_versions.clone(),
+                        parent: root.upcast::<gtk::Widget>(),
+                    });
                 }
-            }
+            },
             Controls::SetInstalledVersions(versions) => {
                 self.installed_versions = versions;
-            }
+            },
             Controls::VersionChosen(version) => {
                 if let Some(game) = &self.game {
                     let (dll, arch) = match &game.status {
                         InstallStatus::Installed { dll, arch } => (*dll, *arch),
-                        InstallStatus::NotInstalled => (
-                            DllOverride::Dxgi,
-                            game.preferred_arch.unwrap_or(ExeArch::X86_64),
-                        ),
+                        InstallStatus::NotInstalled => {
+                            (DllOverride::Dxgi, game.preferred_arch.unwrap_or(ExeArch::X86_64))
+                        },
                     };
                     sender
                         .output(Signal::Install {
@@ -401,16 +392,19 @@ impl SimpleComponent for GameDetail {
                         })
                         .ok();
                 }
-            }
+            },
             Controls::UninstallRequested => {
                 if let Some(game) = &self.game
                     && let InstallStatus::Installed { dll, .. } = &game.status
                 {
                     sender
-                        .output(Signal::Uninstall { game_id: game.id.clone(), dll: *dll })
+                        .output(Signal::Uninstall {
+                            game_id: game.id.clone(),
+                            dll: *dll,
+                        })
                         .ok();
                 }
-            }
+            },
             Controls::ShaderToggled { repo_name, enabled } => {
                 if let Some(game) = &self.game {
                     sender
@@ -421,14 +415,14 @@ impl SimpleComponent for GameDetail {
                         })
                         .ok();
                 }
-            }
+            },
             Controls::OpenFolderRequested => {
                 if let Some(game) = &self.game {
                     let file = gtk::gio::File::for_path(&game.path);
                     let launcher = gtk::FileLauncher::new(Some(&file));
                     launcher.launch(gtk::Window::NONE, gtk::gio::Cancellable::NONE, |_| {});
                 }
-            }
+            },
         }
     }
 }

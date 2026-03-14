@@ -46,10 +46,7 @@ impl InstallVersionDialog {
     /// (three dot-separated non-empty numeric parts).
     fn is_valid(&self) -> bool {
         let parts: Vec<&str> = self.version_text.split('.').collect();
-        parts.len() == 3
-            && parts
-                .iter()
-                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+        parts.len() == 3 && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
     }
 
     /// Returns `true` when the would-be version key is already installed.
@@ -59,11 +56,7 @@ impl InstallVersionDialog {
 
     /// Builds the version key from the current state, prefixing with `v`.
     fn version_key(&self) -> String {
-        if self.addon {
-            format!("v{}-Addon", self.version_text)
-        } else {
-            format!("v{}", self.version_text)
-        }
+        if self.addon { format!("v{}-Addon", self.version_text) } else { format!("v{}", self.version_text) }
     }
 }
 
@@ -124,11 +117,7 @@ impl SimpleComponent for InstallVersionDialog {
         }
     }
 
-    fn init(
-        (): (),
-        root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let mut model = Self {
             version_text: String::new(),
             addon: false,
@@ -152,9 +141,7 @@ impl SimpleComponent for InstallVersionDialog {
             let s = sender.clone();
             move |check| s.input(Controls::SetAddon(check.is_active()))
         });
-        widgets.confirm_btn.connect_clicked({
-            move |_| sender.input(Controls::Confirm)
-        });
+        widgets.confirm_btn.connect_clicked(move |_| sender.input(Controls::Confirm));
 
         ComponentParts { model, widgets }
     }
@@ -166,29 +153,27 @@ impl SimpleComponent for InstallVersionDialog {
                 self.addon = false;
                 self.entry.set_text("");
                 self.addon_check.set_active(false);
-            }
+            },
             Controls::SetVersion(v) => {
                 self.version_text = v;
-            }
+            },
             Controls::SetAddon(v) => {
                 self.addon = v;
-            }
+            },
             Controls::UpdateInstalledVersions(v) => {
                 self.installed_versions = v;
-            }
+            },
             Controls::Confirm => {
                 if !self.is_valid() || self.is_duplicate() {
                     return;
                 }
-                sender
-                    .output(Signal::InstallRequested(self.version_key()))
-                    .ok();
+                sender.output(Signal::InstallRequested(self.version_key())).ok();
                 self.version_text = String::new();
                 self.addon = false;
                 self.entry.set_text("");
                 self.addon_check.set_active(false);
                 self.dialog.close();
-            }
+            },
         }
     }
 }

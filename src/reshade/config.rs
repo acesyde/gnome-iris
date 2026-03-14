@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// Global application configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::module_name_repetitions)]
 pub struct GlobalConfig {
     /// Ordered list of shader repositories.
     pub shader_repos: Vec<ShaderRepo>,
@@ -23,7 +24,7 @@ impl Default for GlobalConfig {
     }
 }
 
-/// A remote Git repository containing ReShade shaders.
+/// A remote Git repository containing `ReShade` shaders.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShaderRepo {
     /// Remote URL (HTTPS).

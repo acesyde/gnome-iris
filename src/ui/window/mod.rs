@@ -5,10 +5,7 @@ mod panel_preferences;
 mod panel_shaders;
 
 use relm4::adw::prelude::*;
-use relm4::{
-    Component, ComponentController, ComponentParts, ComponentSender, Controller,
-    WorkerController, adw, gtk,
-};
+use relm4::{Component, ComponentController, ComponentParts, ComponentSender, Controller, WorkerController, adw, gtk};
 
 use crate::fl;
 use crate::reshade::app_state::AppState;
@@ -55,7 +52,7 @@ pub struct Window {
     pending_install: Option<(crate::reshade::game::DllOverride, crate::reshade::game::ExeArch)>,
     /// ID of the game currently shown in the detail pane (for config refresh).
     current_game_id: Option<String>,
-    /// Locally-cached ReShade version keys; kept in sync with Preferences add/remove.
+    /// Locally-cached `ReShade` version keys; kept in sync with Preferences add/remove.
     installed_versions: Vec<String>,
 }
 
@@ -67,7 +64,7 @@ pub enum Controls {
     GameSelected(String),
     /// User requested removal of a manually added game.
     GameRemoveRequested(String),
-    /// GameDetail requested installation.
+    /// `GameDetail` requested installation.
     Install {
         game_id: String,
         dll: crate::reshade::game::DllOverride,
@@ -75,18 +72,18 @@ pub enum Controls {
         /// The cached version key chosen by the user, e.g. `"v6.3.0"`.
         version: String,
     },
-    /// GameDetail requested uninstallation.
+    /// `GameDetail` requested uninstallation.
     Uninstall {
         game_id: String,
         dll: crate::reshade::game::DllOverride,
     },
-    /// InstallWorker reported progress.
+    /// `InstallWorker` reported progress.
     Progress(String),
-    /// InstallWorker finished installation.
+    /// `InstallWorker` finished installation.
     InstallComplete { version: String },
-    /// InstallWorker finished uninstallation.
+    /// `InstallWorker` finished uninstallation.
     UninstallComplete,
-    /// InstallWorker reported an error.
+    /// `InstallWorker` reported an error.
     WorkerError(String),
     /// User clicked the Add Game button.
     AddGameRequested,
@@ -115,7 +112,7 @@ pub enum Controls {
     ShaderRepoAdded(crate::reshade::config::ShaderRepo),
     /// User clicked the trash button on a custom repo row.
     ShaderRemoveCustomRepoRequested(crate::reshade::config::ShaderRepo),
-    /// Latest ReShade version was fetched from GitHub; forward to Preferences.
+    /// Latest `ReShade` version was fetched from GitHub; forward to Preferences.
     LatestVersionFetched(String),
     /// Preferences requested downloading a version to the local cache.
     VersionDownloadRequested(String),
@@ -155,11 +152,8 @@ impl Component for Window {
         }
     }
 
-    fn init(
-        _: (),
-        root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    #[allow(clippy::too_many_lines)]
+    fn init((): (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         // Load state and discover Steam games.
         let app_state = AppState::load();
         let mut games = app_state.games.clone();
@@ -179,25 +173,37 @@ impl Component for Window {
                 game_list::Signal::GameRemoveRequested(id) => Controls::GameRemoveRequested(id),
             });
 
-        let game_detail = game_detail::GameDetail::builder()
-            .launch(())
-            .forward(sender.input_sender(), |sig| match sig {
-                game_detail::Signal::Install { game_id, dll, arch, version } => {
-                    Controls::Install { game_id, dll, arch, version }
-                }
-                game_detail::Signal::Uninstall { game_id, dll } => {
-                    Controls::Uninstall { game_id, dll }
-                }
-                game_detail::Signal::ShaderToggled { game_id, repo_name, enabled } => {
-                    Controls::ShaderToggled { game_id, repo_name, enabled }
-                }
-            });
+        let game_detail =
+            game_detail::GameDetail::builder()
+                .launch(())
+                .forward(sender.input_sender(), |sig| match sig {
+                    game_detail::Signal::Install {
+                        game_id,
+                        dll,
+                        arch,
+                        version,
+                    } => Controls::Install {
+                        game_id,
+                        dll,
+                        arch,
+                        version,
+                    },
+                    game_detail::Signal::Uninstall { game_id, dll } => Controls::Uninstall { game_id, dll },
+                    game_detail::Signal::ShaderToggled {
+                        game_id,
+                        repo_name,
+                        enabled,
+                    } => Controls::ShaderToggled {
+                        game_id,
+                        repo_name,
+                        enabled,
+                    },
+                });
 
-        let installed_versions = list_installed_versions(&app_state.data_dir)
-            .unwrap_or_else(|e| {
-                log::warn!("Could not list ReShade versions: {e}");
-                Vec::new()
-            });
+        let installed_versions = list_installed_versions(&app_state.data_dir).unwrap_or_else(|e| {
+            log::warn!("Could not list ReShade versions: {e}");
+            Vec::new()
+        });
         let versions_in_use = compute_versions_in_use(&games, &app_state.data_dir);
         let preferences_init = preferences::PreferencesInit {
             data_dir: app_state.data_dir.clone(),
@@ -206,34 +212,28 @@ impl Component for Window {
             current_version: app_state.reshade_version.clone(),
             versions_in_use,
         };
-        let preferences = preferences::Preferences::builder()
-            .launch(preferences_init)
-            .forward(sender.input_sender(), |sig| match sig {
+        let preferences = preferences::Preferences::builder().launch(preferences_init).forward(
+            sender.input_sender(),
+            |sig| match sig {
                 preferences::Signal::ConfigChanged(config) => Controls::ConfigChanged(config),
-                preferences::Signal::InstallVersionRequested(v) => {
-                    Controls::VersionDownloadRequested(v)
-                }
-                preferences::Signal::RemoveVersionRequested(v) => {
-                    Controls::VersionRemoveRequested(v)
-                }
-            });
+                preferences::Signal::InstallVersionRequested(v) => Controls::VersionDownloadRequested(v),
+                preferences::Signal::RemoveVersionRequested(v) => Controls::VersionRemoveRequested(v),
+            },
+        );
 
-        let install_worker = install_worker::InstallWorker::builder()
-            .detach_worker(())
-            .forward(sender.input_sender(), |sig| match sig {
+        let install_worker = install_worker::InstallWorker::builder().detach_worker(()).forward(
+            sender.input_sender(),
+            |sig| match sig {
                 install_worker::Signal::Progress(msg) => Controls::Progress(msg),
-                install_worker::Signal::InstallComplete { version } => {
-                    Controls::InstallComplete { version }
-                }
+                install_worker::Signal::InstallComplete { version } => Controls::InstallComplete { version },
                 install_worker::Signal::UninstallComplete => Controls::UninstallComplete,
                 install_worker::Signal::DownloadVersionComplete { version_key } => {
                     Controls::VersionDownloadComplete(version_key)
-                }
-                install_worker::Signal::DownloadVersionError(e) => {
-                    Controls::VersionDownloadError(e)
-                }
+                },
+                install_worker::Signal::DownloadVersionError(e) => Controls::VersionDownloadError(e),
                 install_worker::Signal::Error(e) => Controls::WorkerError(e),
-            });
+            },
+        );
 
         let known_names: std::collections::HashSet<&str> =
             crate::reshade::catalog::KNOWN_REPOS.iter().map(|e| e.local_name).collect();
@@ -251,43 +251,35 @@ impl Component for Window {
                 custom_repos,
             })
             .forward(sender.input_sender(), |sig| match sig {
-                shader_catalog::Signal::DownloadRequested(repo) => {
-                    Controls::ShaderDownloadRequested(repo)
-                }
-                shader_catalog::Signal::AddCustomRepoRequested => {
-                    Controls::ShaderAddCustomRepoRequested
-                }
+                shader_catalog::Signal::DownloadRequested(repo) => Controls::ShaderDownloadRequested(repo),
+                shader_catalog::Signal::AddCustomRepoRequested => Controls::ShaderAddCustomRepoRequested,
                 shader_catalog::Signal::RemoveCustomRepoRequested(repo) => {
                     Controls::ShaderRemoveCustomRepoRequested(repo)
-                }
+                },
             });
 
-        let add_shader_repo_dialog = add_shader_repo_dialog::AddShaderRepoDialog::builder()
-            .launch(())
-            .forward(sender.input_sender(), |sig| match sig {
-                add_shader_repo_dialog::Signal::RepoAdded(repo) => {
-                    Controls::ShaderRepoAdded(repo)
-                }
-            });
+        let add_shader_repo_dialog =
+            add_shader_repo_dialog::AddShaderRepoDialog::builder()
+                .launch(())
+                .forward(sender.input_sender(), |sig| match sig {
+                    add_shader_repo_dialog::Signal::RepoAdded(repo) => Controls::ShaderRepoAdded(repo),
+                });
 
         let add_game_dialog = add_game_dialog::AddGameDialog::builder()
             .launch(games.iter().map(|g| g.path.clone()).collect())
             .forward(sender.input_sender(), |sig| match sig {
-                add_game_dialog::Signal::GameAdded { name, path, arch } => {
-                    Controls::GameAdded { name, path, arch }
-                }
+                add_game_dialog::Signal::GameAdded { name, path, arch } => Controls::GameAdded { name, path, arch },
             });
 
-        let shader_worker = shader_worker::ShaderWorker::builder()
-            .detach_worker(())
-            .forward(sender.input_sender(), |sig| match sig {
-                shader_worker::Signal::Progress(msg) => Controls::ShaderProgress(msg),
-                shader_worker::Signal::Complete => Controls::ShaderSyncComplete,
-                shader_worker::Signal::RepoError { error, .. } => {
-                    Controls::ShaderSyncError(error)
-                }
-                shader_worker::Signal::Error(e) => Controls::ShaderSyncError(e),
-            });
+        let shader_worker =
+            shader_worker::ShaderWorker::builder()
+                .detach_worker(())
+                .forward(sender.input_sender(), |sig| match sig {
+                    shader_worker::Signal::Progress(msg) => Controls::ShaderProgress(msg),
+                    shader_worker::Signal::Complete => Controls::ShaderSyncComplete,
+                    shader_worker::Signal::RepoError { error, .. } => Controls::ShaderSyncError(error),
+                    shader_worker::Signal::Error(e) => Controls::ShaderSyncError(e),
+                });
 
         // Capture values needed for version-check task before app_state is moved.
         let update_interval = app_state.config.update_interval_hours;
@@ -328,17 +320,13 @@ impl Component for Window {
             .license_type(gtk::License::Gpl20)
             .comments("ReShade manager for Wine/Proton games on Linux")
             .build();
-        about_dialog.add_link(
-            "reshade-steam-proton",
-            "https://github.com/kevinlekiller/reshade-steam-proton",
-        );
+        about_dialog.add_link("reshade-steam-proton", "https://github.com/kevinlekiller/reshade-steam-proton");
         about_dialog.add_link("ReShade", "https://reshade.me/");
         about_dialog.add_link("ratic (codebase)", "https://gitlab.gnome.org/ratcornu/ratic");
         {
-            let dialog = about_dialog.clone();
             let win = root.clone();
             let about_action = gtk::gio::SimpleAction::new("about", None);
-            about_action.connect_activate(move |_, _| dialog.present(Some(&win)));
+            about_action.connect_activate(move |_, _| about_dialog.present(Some(&win)));
             root.add_action(&about_action);
         }
 
@@ -402,11 +390,11 @@ impl Component for Window {
 
         // Spawn startup version check respecting the configured interval.
         {
-            let sender_clone = sender.clone();
+            use crate::reshade::cache::UpdateCache;
+            use crate::reshade::d3dcompiler;
+            use crate::reshade::game::ExeArch;
+            use crate::reshade::reshade::fetch_latest_version;
             relm4::spawn(async move {
-                use crate::reshade::cache::UpdateCache;
-                use crate::reshade::reshade::fetch_latest_version;
-
                 let d3dc_dir = cache_data_dir.clone();
                 let cache = UpdateCache::new(cache_data_dir);
                 let version = if cache.needs_update(update_interval) {
@@ -419,22 +407,20 @@ impl Component for Window {
                                 log::warn!("Could not touch update cache: {e}");
                             }
                             Some(v)
-                        }
+                        },
                         Err(e) => {
                             log::warn!("ReShade version check failed: {e}");
                             cache.read_version().unwrap_or(None)
-                        }
+                        },
                     }
                 } else {
                     cache.read_version().unwrap_or(None)
                 };
                 if let Some(v) = version {
-                    sender_clone.input(Controls::LatestVersionFetched(v));
+                    sender.input(Controls::LatestVersionFetched(v));
                 }
 
                 // Ensure both d3dcompiler DLLs are present in the data directory.
-                use crate::reshade::d3dcompiler;
-                use crate::reshade::game::ExeArch;
                 for arch in [ExeArch::X86, ExeArch::X86_64] {
                     if let Err(e) = d3dcompiler::ensure(&d3dc_dir, arch) {
                         log::warn!("Could not install d3dcompiler_47.dll: {e}");
@@ -450,82 +436,84 @@ impl Component for Window {
         match msg {
             Controls::GameSelected(id) => panel_games::handle_game_selected(self, id),
             Controls::GameRemoveRequested(id) => panel_games::handle_game_remove(self, id),
-            Controls::Install { game_id, dll, arch, version } => {
-                panel_games::handle_install(self, game_id, dll, arch, version);
-            }
+            Controls::Install {
+                game_id,
+                dll,
+                arch,
+                version,
+            } => {
+                panel_games::handle_install(self, &game_id, dll, arch, version);
+            },
             Controls::Uninstall { game_id, dll } => {
-                panel_games::handle_uninstall(self, game_id, dll);
-            }
+                panel_games::handle_uninstall(self, &game_id, dll);
+            },
             Controls::Progress(msg) => panel_games::handle_progress(self, msg),
             Controls::InstallComplete { version } => {
                 panel_games::handle_install_complete(self, version);
-            }
+            },
             Controls::UninstallComplete => panel_games::handle_uninstall_complete(self),
-            Controls::WorkerError(e) => panel_games::handle_worker_error(self, e),
+            Controls::WorkerError(e) => panel_games::handle_worker_error(self, &e),
             Controls::AddGameRequested => panel_games::handle_add_game_requested(self, root),
             Controls::GameAdded { name, path, arch } => {
                 panel_games::handle_game_added(self, name, path, arch);
-            }
+            },
             Controls::ConfigChanged(config) => {
                 panel_preferences::handle_config_changed(self, config);
-            }
+            },
             Controls::ShaderDownloadRequested(repo) => {
                 panel_shaders::handle_download_requested(self, repo);
-            }
+            },
             Controls::ShaderProgress(msg) => panel_shaders::handle_progress(self, msg),
             Controls::ShaderSyncComplete => panel_shaders::handle_sync_complete(self),
             Controls::ShaderSyncError(e) => panel_shaders::handle_sync_error(self, e),
             Controls::ShaderAddCustomRepoRequested => {
                 panel_shaders::handle_add_custom_repo_requested(self, root);
-            }
+            },
             Controls::ShaderRemoveCustomRepoRequested(repo) => {
                 panel_shaders::handle_remove_custom_repo_requested(self, repo);
-            }
+            },
             Controls::ShaderRepoAdded(repo) => panel_shaders::handle_repo_added(self, repo),
             Controls::LatestVersionFetched(version) => {
                 panel_preferences::handle_latest_version_fetched(self, version);
-            }
+            },
             Controls::VersionDownloadRequested(version_key) => {
-                panel_preferences::handle_version_download_requested(self, version_key);
-            }
+                panel_preferences::handle_version_download_requested(self, &version_key);
+            },
             Controls::VersionDownloadComplete(version) => {
                 panel_preferences::handle_version_download_complete(self, version);
-            }
+            },
             Controls::VersionDownloadError(e) => {
-                panel_preferences::handle_version_download_error(self, e);
-            }
+                panel_preferences::handle_version_download_error(self, &e);
+            },
             Controls::VersionRemoveRequested(version) => {
-                panel_preferences::handle_version_remove_requested(self, version);
-            }
-            Controls::ShaderToggled { game_id, repo_name, enabled } => {
-                panel_games::handle_shader_toggled(self, game_id, repo_name, enabled);
-            }
+                panel_preferences::handle_version_remove_requested(self, &version);
+            },
+            Controls::ShaderToggled {
+                game_id,
+                repo_name,
+                enabled,
+            } => {
+                panel_games::handle_shader_toggled(self, &game_id, &repo_name, enabled);
+            },
         }
     }
 }
 
-/// Determine which cached ReShade versions are currently in use by at least one game.
+/// Determine which cached `ReShade` versions are currently in use by at least one game.
 ///
 /// A version is "in use" when a game's DLL symlink points into that version's directory.
-fn compute_versions_in_use(
-    games: &[Game],
-    data_dir: &std::path::Path,
-) -> std::collections::HashSet<String> {
+fn compute_versions_in_use(games: &[Game], data_dir: &std::path::Path) -> std::collections::HashSet<String> {
     let reshade_dir = data_dir.join("reshade");
     let mut in_use = std::collections::HashSet::new();
     for game in games {
         if let InstallStatus::Installed { dll, .. } = &game.status {
             let link = game.path.join(dll.symlink_name());
             if let Ok(target) = std::fs::read_link(&link) {
-                let abs = if target.is_absolute() {
-                    target
-                } else {
-                    game.path.join(&target)
-                };
-                if let Ok(rel) = abs.strip_prefix(&reshade_dir) {
-                    if let Some(comp) = rel.components().next() {
-                        in_use.insert(comp.as_os_str().to_string_lossy().into_owned());
-                    }
+                let abs = if target.is_absolute() { target } else { game.path.join(&target) };
+                if let Ok(rel) = abs.strip_prefix(&reshade_dir)
+                    && let Some(comp) = rel.components().next()
+                {
+                    in_use.insert(comp.as_os_str().to_string_lossy().into_owned());
                 }
             }
         }

@@ -1,12 +1,12 @@
 //! # gnome-iris
 //!
-//! GTK4 + Relm4 GUI for managing ReShade under Wine/Proton on Linux.
+//! GTK4 + Relm4 GUI for managing `ReShade` under Wine/Proton on Linux.
 
 use std::io::Write;
 
 use anyhow::Result;
-use relm4::{RELM_THREADS, RelmApp, gtk};
 use relm4::gtk::{gdk, gio};
+use relm4::{RELM_THREADS, RelmApp, gtk};
 
 use crate::ui::window::Window;
 
@@ -25,7 +25,7 @@ pub mod reshade;
 /// UI module.
 pub mod ui;
 
-/// D-Bus application ID. Must match the GSettings schema id and GResource prefix.
+/// D-Bus application ID. Must match the `GSettings` schema id and `GResource` prefix.
 pub const APPLICATION_ID: &str = "org.gnome.Iris";
 
 fn initialize_custom_resources() {

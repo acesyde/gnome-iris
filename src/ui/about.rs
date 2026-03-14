@@ -5,6 +5,7 @@ use relm4::gtk;
 use relm4::{ComponentParts, ComponentSender, SimpleComponent};
 
 /// About dialog component.
+#[allow(clippy::module_name_repetitions)]
 pub struct AboutDialog;
 
 /// Input messages for [`AboutDialog`].
@@ -33,11 +34,7 @@ impl SimpleComponent for AboutDialog {
         }
     }
 
-    fn init(
-        _: (),
-        _root: Self::Root,
-        _sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    fn init((): (), root: Self::Root, _sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let model = Self;
         let widgets = view_output!();
         ComponentParts { model, widgets }
@@ -45,7 +42,7 @@ impl SimpleComponent for AboutDialog {
 
     fn update(&mut self, msg: Controls, _sender: ComponentSender<Self>) {
         match msg {
-            Controls::Show => {}
+            Controls::Show => {},
         }
     }
 }

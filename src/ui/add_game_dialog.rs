@@ -138,11 +138,10 @@ impl SimpleComponent for AddGameDialog {
                                     fd.set_default_filter(Some(&filter));
                                     let parent = btn.root().and_downcast::<gtk::Window>();
                                     gtk::glib::MainContext::default().spawn_local(async move {
-                                        if let Ok(file) = fd.open_future(parent.as_ref()).await {
-                                            if let Some(path) = file.path() {
+                                        if let Ok(file) = fd.open_future(parent.as_ref()).await
+                                            && let Some(path) = file.path() {
                                                 sender.input(Controls::FileSelected(path));
                                             }
-                                        }
                                     });
                                 },
                             },
@@ -158,11 +157,7 @@ impl SimpleComponent for AddGameDialog {
         }
     }
 
-    fn init(
-        existing_paths: Vec<PathBuf>,
-        _root: Self::Root,
-        sender: ComponentSender<Self>,
-    ) -> ComponentParts<Self> {
+    fn init(existing_paths: Vec<PathBuf>, root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let mut model = Self {
             name: String::new(),
             path: None,
@@ -206,19 +201,18 @@ impl SimpleComponent for AddGameDialog {
         widgets.arch_group.add(&x64_row);
         widgets.arch_group.add(&x86_row);
 
-        arch_x64_btn.connect_toggled({
-            let s = sender.clone();
-            move |btn| {
-                if btn.is_active() {
-                    s.input(Controls::SetArch(ExeArch::X86_64));
-                }
-            }
-        });
         arch_x86_btn.connect_toggled({
             let s = sender.clone();
             move |btn| {
                 if btn.is_active() {
                     s.input(Controls::SetArch(ExeArch::X86));
+                }
+            }
+        });
+        arch_x64_btn.connect_toggled({
+            move |btn| {
+                if btn.is_active() {
+                    sender.input(Controls::SetArch(ExeArch::X86_64));
                 }
             }
         });
@@ -240,27 +234,24 @@ impl SimpleComponent for AddGameDialog {
                 self.path_row.set_subtitle("");
                 self.path_row.remove_css_class("error");
                 self.arch_x64_btn.set_active(true);
-            }
+            },
             Controls::SetName(v) => self.name = v,
             Controls::SetArch(arch) => self.arch = arch,
             Controls::UpdateExistingPaths(paths) => {
                 self.existing_paths = paths;
                 // Re-evaluate duplicate status for the currently selected path.
                 self.refresh_duplicate();
-            }
+            },
             Controls::FileSelected(path) => {
                 let dir = if path.is_file() {
                     // Detect arch from PE header; default to x64 on failure.
-                    let detected = crate::reshade::steam::detect_exe_arch(&path)
-                        .unwrap_or(ExeArch::X86_64);
+                    let detected = crate::reshade::steam::detect_exe_arch(&path).unwrap_or(ExeArch::X86_64);
                     self.arch = detected;
                     match detected {
                         ExeArch::X86_64 => self.arch_x64_btn.set_active(true),
                         ExeArch::X86 => self.arch_x86_btn.set_active(true),
                     }
-                    path.parent()
-                        .map(|p| p.to_path_buf())
-                        .unwrap_or(path)
+                    path.parent().map(std::path::Path::to_path_buf).unwrap_or(path)
                 } else {
                     path
                 };
@@ -279,7 +270,7 @@ impl SimpleComponent for AddGameDialog {
                 } else {
                     self.path_row.remove_css_class("error");
                 }
-            }
+            },
             Controls::Confirm => {
                 let name = self.name.trim().to_owned();
                 let Some(path) = self.path.clone() else { return };
@@ -287,7 +278,11 @@ impl SimpleComponent for AddGameDialog {
                     return;
                 }
                 sender
-                    .output(Signal::GameAdded { name, path, arch: self.arch })
+                    .output(Signal::GameAdded {
+                        name,
+                        path,
+                        arch: self.arch,
+                    })
                     .ok();
                 // Reset fields.
                 self.name = String::new();
@@ -299,7 +294,7 @@ impl SimpleComponent for AddGameDialog {
                 self.path_row.remove_css_class("error");
                 self.arch_x64_btn.set_active(true);
                 self.dialog.close();
-            }
+            },
         }
     }
 }
@@ -307,10 +302,6 @@ impl SimpleComponent for AddGameDialog {
 impl AddGameDialog {
     /// Recomputes `self.duplicate` from `self.path` and `self.existing_paths`.
     fn refresh_duplicate(&mut self) {
-        self.duplicate = self
-            .path
-            .as_ref()
-            .map(|p| self.existing_paths.contains(p))
-            .unwrap_or(false);
+        self.duplicate = self.path.as_ref().is_some_and(|p| self.existing_paths.contains(p));
     }
 }

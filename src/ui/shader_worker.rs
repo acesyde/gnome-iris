@@ -55,7 +55,7 @@ impl Worker for ShaderWorker {
     type Input = Controls;
     type Output = Signal;
 
-    fn init(_: (), _sender: ComponentSender<Self>) -> Self {
+    fn init((): (), _sender: ComponentSender<Self>) -> Self {
         Self
     }
 
@@ -72,12 +72,7 @@ impl Worker for ShaderWorker {
                     return;
                 }
                 for repo in &repos {
-                    sender
-                        .output(Signal::Progress(format!(
-                            "Syncing {}...",
-                            repo.local_name
-                        )))
-                        .ok();
+                    sender.output(Signal::Progress(format!("Syncing {}...", repo.local_name))).ok();
                     if let Err(e) = shaders::sync_repo(repo, &repos_dir) {
                         sender
                             .output(Signal::RepoError {
@@ -92,19 +87,14 @@ impl Worker for ShaderWorker {
                     return;
                 }
                 sender.output(Signal::Complete).ok();
-            }
+            },
             Controls::SyncOne { repo, data_dir } => {
                 let repos_dir = data_dir.join("ReShade_shaders");
                 if let Err(e) = std::fs::create_dir_all(&repos_dir) {
                     sender.output(Signal::Error(e.to_string())).ok();
                     return;
                 }
-                sender
-                    .output(Signal::Progress(format!(
-                        "Syncing {}...",
-                        repo.local_name
-                    )))
-                    .ok();
+                sender.output(Signal::Progress(format!("Syncing {}...", repo.local_name))).ok();
                 match shaders::sync_repo(&repo, &repos_dir) {
                     Ok(()) => sender.output(Signal::Complete).ok(),
                     Err(e) => sender
@@ -114,7 +104,7 @@ impl Worker for ShaderWorker {
                         })
                         .ok(),
                 };
-            }
+            },
         }
     }
 }

@@ -1,4 +1,4 @@
-//! Core domain logic for gnome-iris — ReShade management for Wine/Proton games.
+//! Core domain logic for gnome-iris — `ReShade` management for Wine/Proton games.
 //!
 //! This module is GTK-free. All types here are pure Rust.
 
@@ -9,6 +9,7 @@ pub mod config;
 pub mod d3dcompiler;
 pub mod game;
 pub mod install;
+#[allow(clippy::module_inception)]
 pub mod reshade;
 pub mod shaders;
 pub mod steam;
