@@ -1,2 +1,5 @@
 [tools]
+actionlint = "1.7.11"
+hk = "1.38.0"
+pkl = "0.31.0"
 rust = "1.94.0"
