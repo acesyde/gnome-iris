@@ -174,6 +174,21 @@ pub(super) fn handle_game_added(model: &mut Window, name: String, path: PathBuf,
     }
     model.games.push(game.clone());
     model.game_list.emit(game_list::Controls::AddGame(game));
+    // Prime the pill immediately if the latest version is already known.
+    // game was moved by AddGame; read back from model.games which was pushed above.
+    if model.latest_version.is_some()
+        && let Some(g) = model.games.last()
+    {
+        let installed_version = match &g.status {
+            InstallStatus::Installed { version: v, .. } => v.clone(),
+            InstallStatus::NotInstalled => None,
+        };
+        model.game_list.emit(game_list::Controls::SetGameStatus {
+            id: g.id.clone(),
+            version: installed_version,
+            latest_version: model.latest_version.clone(),
+        });
+    }
     // Keep the dialog's duplicate-detection list in sync.
     let paths = model.games.iter().map(|g| g.path.clone()).collect();
     model.add_game_dialog.emit(add_game_dialog::Controls::UpdateExistingPaths(paths));
