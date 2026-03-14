@@ -48,6 +48,7 @@ fn main() -> Result<()> {
     RELM_THREADS.set(4).expect("Could not set thread count");
 
     let app = RelmApp::new(APPLICATION_ID);
+    relm4::set_global_css("label.pill { border-radius: 9999px; padding: 2px 8px; }");
     app.run::<Window>(());
 
     Ok(())
