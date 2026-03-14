@@ -36,7 +36,6 @@ pub(super) fn handle_game_selected(model: &mut Window, id: String) {
         model.game_detail.emit(game_detail::Controls::SetShaderData {
             repos: downloaded_repos,
             overrides: game.shader_overrides,
-            reshade_version: model.app_state.reshade_version.clone(),
         });
         model
             .game_detail
@@ -80,9 +79,9 @@ pub(super) fn handle_progress(model: &Window, msg: String) {
 pub(super) fn handle_install_complete(model: &mut Window, version: String) {
     let (dll, arch) = model.pending_install.take().unwrap_or((DllOverride::Dxgi, ExeArch::X86_64));
     model.game_detail.emit(game_detail::Controls::ClearProgress);
-    model.game_detail.emit(game_detail::Controls::MarkInstalled { version, dll, arch });
+    model.game_detail.emit(game_detail::Controls::MarkInstalled { version: version.clone(), dll, arch });
     if let Some(id) = &model.current_game_id {
-        let status = InstallStatus::Installed { dll, arch };
+        let status = InstallStatus::Installed { dll, arch, version: Some(version.clone()) };
         if let Some(game) = model.games.iter_mut().find(|g| &g.id == id) {
             game.status = status.clone();
         }

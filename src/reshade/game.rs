@@ -78,6 +78,9 @@ pub enum InstallStatus {
         dll: DllOverride,
         /// Detected executable architecture.
         arch: ExeArch,
+        /// The installed `ReShade` version string, e.g. `"6.5.0"`.
+        #[serde(default)]
+        version: Option<String>,
     },
 }
 
@@ -197,6 +200,7 @@ mod tests {
         let status = InstallStatus::Installed {
             dll: DllOverride::Dxgi,
             arch: ExeArch::X86_64,
+            version: None,
         };
         assert!(status.is_installed());
         assert!(!InstallStatus::NotInstalled.is_installed());

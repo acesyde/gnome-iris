@@ -80,14 +80,16 @@ pub const fn default_dll_for_arch(arch: ExeArch) -> DllOverride {
 /// Detects the current `ReShade` install status by inspecting symlinks in `game_dir`.
 ///
 /// Scans for any known DLL override symlink. When found, reads the symlink
-/// target to determine architecture from the DLL name (`ReShade64` vs `ReShade32`).
+/// target to determine architecture from the DLL name (`ReShade64` vs `ReShade32`)
+/// and the version from the parent directory name of the target path.
 #[must_use]
 pub fn detect_install_status(game_dir: &Path) -> InstallStatus {
     for &dll in DllOverride::all() {
         let symlink = game_dir.join(dll.symlink_name());
         if symlink.is_symlink() {
-            let arch = std::fs::read_link(&symlink)
-                .ok()
+            let target = std::fs::read_link(&symlink).ok();
+            let arch = target
+                .as_ref()
                 .and_then(|p| {
                     let s = p.to_string_lossy().into_owned();
                     if s.contains("ReShade64") {
@@ -99,7 +101,11 @@ pub fn detect_install_status(game_dir: &Path) -> InstallStatus {
                     }
                 })
                 .unwrap_or(ExeArch::X86_64);
-            return InstallStatus::Installed { dll, arch };
+            // The target path is <base>/reshade/<version>/ReShade{32,64}.dll,
+            // so the version is the name of the parent directory.
+            let version = target
+                .and_then(|p| p.parent()?.file_name()?.to_str().map(String::from));
+            return InstallStatus::Installed { dll, arch, version };
         }
     }
     InstallStatus::NotInstalled
@@ -185,7 +191,8 @@ mod tests {
             status,
             InstallStatus::Installed {
                 dll: DllOverride::Dxgi,
-                arch: ExeArch::X86_64
+                arch: ExeArch::X86_64,
+                ..
             }
         ));
     }

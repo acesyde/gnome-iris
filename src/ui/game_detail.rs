@@ -15,7 +15,6 @@ pub struct GameDetail {
     game: Option<Game>,
     progress_message: Option<String>,
     shader_repos: Vec<ShaderRepo>,
-    reshade_version: Option<String>,
     shader_list: gtk::ListBox,
     /// Locally-cached `ReShade` version keys (e.g. `"v6.3.0"`), set by Window.
     installed_versions: Vec<String>,
@@ -51,8 +50,6 @@ pub enum Controls {
         repos: Vec<ShaderRepo>,
         /// Per-game shader overrides.
         overrides: ShaderOverrides,
-        /// Currently installed `ReShade` version string.
-        reshade_version: Option<String>,
     },
     /// Internal: install button clicked — `update()` reads `self.game`.
     InstallRequested,
@@ -113,13 +110,13 @@ impl GameDetail {
         };
         match &game.status {
             InstallStatus::NotInstalled => fl!("not-installed"),
-            InstallStatus::Installed { dll, arch } => {
+            InstallStatus::Installed { dll, arch, version } => {
                 let arch_str = match arch {
                     ExeArch::X86 => "x86",
                     ExeArch::X86_64 => "x86_64",
                 };
-                let version = self.reshade_version.as_deref().unwrap_or("?");
-                format!("{arch_str} \u{00B7} {dll} \u{00B7} ReShade {version}")
+                let version_str = version.as_deref().unwrap_or("?");
+                format!("{arch_str} \u{00B7} {dll} \u{00B7} ReShade {version_str}")
             },
         }
     }
@@ -223,6 +220,8 @@ impl SimpleComponent for GameDetail {
                                 set_title: model.progress_message.as_deref().unwrap_or(""),
                                 #[watch]
                                 set_revealed: model.progress_message.is_some(),
+                                #[watch]
+                                set_visible: model.progress_message.is_some(),
                             },
 
                             // No-versions warning banner
@@ -231,6 +230,8 @@ impl SimpleComponent for GameDetail {
                                 set_title: &fl!("no-versions-banner"),
                                 #[watch]
                                 set_revealed: model.game.is_some() && model.installed_versions.is_empty(),
+                                #[watch]
+                                set_visible: model.game.is_some() && model.installed_versions.is_empty(),
                             },
 
                             // Action buttons (centered, pill-shaped)
@@ -320,7 +321,6 @@ impl SimpleComponent for GameDetail {
             game: None,
             progress_message: None,
             shader_repos: Vec::new(),
-            reshade_version: None,
             shader_list: gtk::ListBox::new(),
             installed_versions: Vec::new(),
             pick_version_dialog,
@@ -343,22 +343,16 @@ impl SimpleComponent for GameDetail {
             Controls::ClearProgress => self.progress_message = None,
             Controls::MarkInstalled { dll, arch, version } => {
                 if let Some(game) = &mut self.game {
-                    game.status = InstallStatus::Installed { dll, arch };
+                    game.status = InstallStatus::Installed { dll, arch, version: Some(version) };
                 }
-                self.reshade_version = Some(version);
             },
             Controls::MarkUninstalled => {
                 if let Some(game) = &mut self.game {
                     game.status = InstallStatus::NotInstalled;
                 }
             },
-            Controls::SetShaderData {
-                repos,
-                overrides,
-                reshade_version,
-            } => {
+            Controls::SetShaderData { repos, overrides } => {
                 self.shader_repos = repos;
-                self.reshade_version = reshade_version;
                 if let Some(game) = &mut self.game {
                     game.shader_overrides = overrides;
                 }
@@ -379,7 +373,7 @@ impl SimpleComponent for GameDetail {
             Controls::VersionChosen(version) => {
                 if let Some(game) = &self.game {
                     let (dll, arch) = match &game.status {
-                        InstallStatus::Installed { dll, arch } => (*dll, *arch),
+                        InstallStatus::Installed { dll, arch, .. } => (*dll, *arch),
                         InstallStatus::NotInstalled => {
                             (DllOverride::Dxgi, game.preferred_arch.unwrap_or(ExeArch::X86_64))
                         },
