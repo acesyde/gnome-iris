@@ -44,6 +44,21 @@ pub enum Signal {
 }
 
 impl PickReshadeVersionDialog {
+    /// Parse a version key into a sortable tuple `(major, minor, patch, is_addon)`.
+    ///
+    /// Used to sort versions newest-first, with the plain variant before the Addon
+    /// variant when both share the same base version.
+    fn version_sort_key(key: &str) -> (u64, u64, u64, bool) {
+        let base = key.strip_prefix('v').unwrap_or(key);
+        let is_addon = base.ends_with("-Addon");
+        let ver = base.strip_suffix("-Addon").unwrap_or(base);
+        let mut parts = ver.split('.').map(|p| p.parse::<u64>().unwrap_or(0));
+        let major = parts.next().unwrap_or(0);
+        let minor = parts.next().unwrap_or(0);
+        let patch = parts.next().unwrap_or(0);
+        (major, minor, patch, is_addon)
+    }
+
     /// Format a version key for display.
     ///
     /// Strips the leading `v` and converts `"-Addon"` to `" — Addon Support"`.
@@ -145,7 +160,14 @@ impl SimpleComponent for PickReshadeVersionDialog {
                 if versions.is_empty() {
                     return;
                 }
-                // 4. Build radio rows.
+                // 4. Sort newest-first; plain variant before Addon for the same base.
+                let mut versions = versions;
+                versions.sort_by(|a, b| {
+                    let (ma, mia, pa, aa) = Self::version_sort_key(a);
+                    let (mb, mib, pb, ab) = Self::version_sort_key(b);
+                    (mb, mib, pb).cmp(&(ma, mia, pa)).then(aa.cmp(&ab))
+                });
+                // 5. Build radio rows.
                 let mut group_anchor: Option<gtk::CheckButton> = None;
                 for key in &versions {
                     let check = gtk::CheckButton::new();
