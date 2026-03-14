@@ -54,6 +54,8 @@ pub struct Window {
     current_game_id: Option<String>,
     /// Locally-cached `ReShade` version keys; kept in sync with Preferences add/remove.
     installed_versions: Vec<String>,
+    /// Latest known `ReShade` version fetched from GitHub (or read from cache).
+    latest_version: Option<String>,
 }
 
 /// Input messages for [`Window`].
@@ -380,6 +382,7 @@ impl Component for Window {
             pending_install: None,
             current_game_id: None,
             installed_versions,
+            latest_version: None,
         };
 
         let nav_view = &nav_view;
