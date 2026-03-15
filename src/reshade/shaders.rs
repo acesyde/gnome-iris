@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 use crate::reshade::config::ShaderRepo;
+use crate::reshade::paths::{MERGED_DIR, RESHADE_SHADERS_DIR};
 
 /// Clones or updates a shader repository.
 ///
@@ -57,8 +58,8 @@ fn fetch_and_merge(repo: &git2::Repository) -> Result<()> {
 /// # Errors
 /// Returns an error if directory creation or symlinking fails.
 pub fn rebuild_merged(repos_dir: &Path, disabled_repos: &[String]) -> Result<()> {
-    let merged_shaders = repos_dir.join("Merged/Shaders");
-    let merged_textures = repos_dir.join("Merged/Textures");
+    let merged_shaders = repos_dir.join(MERGED_DIR).join("Shaders");
+    let merged_textures = repos_dir.join(MERGED_DIR).join("Textures");
     std::fs::create_dir_all(&merged_shaders)?;
     std::fs::create_dir_all(&merged_textures)?;
 
@@ -68,7 +69,7 @@ pub fn rebuild_merged(repos_dir: &Path, disabled_repos: &[String]) -> Result<()>
         .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         .filter(|e| {
             let name = e.file_name().to_string_lossy().into_owned();
-            name != "Merged" && !disabled_repos.contains(&name)
+            name != MERGED_DIR && !disabled_repos.contains(&name)
         });
 
     for entry in entries {
@@ -110,13 +111,13 @@ pub fn link_shader_files(src_dir: &Path, dest_dir: &Path) -> Result<()> {
 /// Returns the path to the merged shaders directory.
 #[must_use]
 pub fn merged_shaders_dir(base: &Path) -> PathBuf {
-    base.join("ReShade_shaders/Merged/Shaders")
+    base.join(RESHADE_SHADERS_DIR).join(MERGED_DIR).join("Shaders")
 }
 
 /// Returns the path to the merged textures directory.
 #[must_use]
 pub fn merged_textures_dir(base: &Path) -> PathBuf {
-    base.join("ReShade_shaders/Merged/Textures")
+    base.join(RESHADE_SHADERS_DIR).join(MERGED_DIR).join("Textures")
 }
 
 #[cfg(test)]

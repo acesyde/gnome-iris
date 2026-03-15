@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 use crate::reshade::game::{DllOverride, ExeArch, InstallStatus};
+use crate::reshade::paths::{MERGED_DIR, RESHADE_SHADERS_DIR};
 
 /// Installs `ReShade` into `game_dir` by creating symlinks.
 ///
@@ -28,7 +29,7 @@ pub fn install_reshade(base: &Path, game_dir: &Path, version: &str, dll: DllOver
     symlink_force(&d3dc_src, &d3dc_dest)?;
 
     // Shaders dir (optional — skip if not yet populated)
-    let shaders_src = base.join("ReShade_shaders/Merged");
+    let shaders_src = base.join(RESHADE_SHADERS_DIR).join(MERGED_DIR);
     let shaders_dest = game_dir.join("reshade-shaders");
     if shaders_src.exists() && !shaders_dest.exists() && !shaders_dest.is_symlink() {
         symlink_force(&shaders_src, &shaders_dest)?;

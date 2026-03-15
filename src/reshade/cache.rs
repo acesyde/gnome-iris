@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use super::paths::RESHADE_STATE_FILE;
 use super::reshade::parse_version_key;
 
 /// Persisted version and update state for `ReShade`.
@@ -33,7 +34,7 @@ impl UpdateCache {
     }
 
     fn state_path(&self) -> PathBuf {
-        self.base.join("reshade_state.json")
+        self.base.join(RESHADE_STATE_FILE)
     }
 
     fn read_state(&self) -> Result<VersionState> {

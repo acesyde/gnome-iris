@@ -9,6 +9,7 @@ use tokio::sync::RwLock;
 use crate::reshade::cache::UpdateCache;
 use crate::reshade::config::GlobalConfig;
 use crate::reshade::game::Game;
+use crate::reshade::paths::{CONFIG_FILE, GAMES_FILE};
 
 /// Shared mutable application state — wrap in `Arc<RwLock<_>>` to share across components.
 pub type Shared<T> = Arc<RwLock<T>>;
@@ -49,9 +50,9 @@ impl AppState {
     pub fn save(&self) -> anyhow::Result<()> {
         std::fs::create_dir_all(&self.data_dir)?;
         let config_json = serde_json::to_string_pretty(&self.config)?;
-        std::fs::write(self.data_dir.join("config.json"), config_json)?;
+        std::fs::write(self.data_dir.join(CONFIG_FILE), config_json)?;
         let games_json = serde_json::to_string_pretty(&self.games)?;
-        std::fs::write(self.data_dir.join("games.json"), games_json)?;
+        std::fs::write(self.data_dir.join(GAMES_FILE), games_json)?;
         Ok(())
     }
 }
@@ -69,7 +70,7 @@ pub fn iris_data_dir() -> PathBuf {
 }
 
 fn load_config(data_dir: &Path) -> GlobalConfig {
-    let path = data_dir.join("config.json");
+    let path = data_dir.join(CONFIG_FILE);
     std::fs::read_to_string(path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -77,7 +78,7 @@ fn load_config(data_dir: &Path) -> GlobalConfig {
 }
 
 fn load_games(data_dir: &Path) -> Vec<Game> {
-    let path = data_dir.join("games.json");
+    let path = data_dir.join(GAMES_FILE);
     std::fs::read_to_string(path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())

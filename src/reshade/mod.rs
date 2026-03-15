@@ -9,6 +9,7 @@ pub mod config;
 pub mod d3dcompiler;
 pub mod game;
 pub mod install;
+pub mod paths;
 #[allow(clippy::module_inception)]
 pub mod reshade;
 pub mod shaders;
