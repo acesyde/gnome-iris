@@ -14,6 +14,89 @@ use crate::ui::{add_game_dialog, game_detail, game_list, install_worker};
 
 use super::Window;
 
+/// Messages handled by the Games panel.
+#[derive(Debug)]
+pub enum GamesMsg {
+    /// A game was selected in the list.
+    GameSelected(String),
+    /// User requested removal of a manually added game.
+    GameRemoveRequested(String),
+    /// `GameDetail` requested installation.
+    Install {
+        /// Stable game ID.
+        game_id: String,
+        /// DLL override type chosen by the user.
+        dll: DllOverride,
+        /// Architecture of the game executable.
+        arch: ExeArch,
+        /// The cached version key chosen by the user, e.g. `"v6.3.0"`.
+        version: String,
+    },
+    /// `GameDetail` requested uninstallation.
+    Uninstall {
+        /// Stable game ID.
+        game_id: String,
+        /// DLL override type to remove.
+        dll: DllOverride,
+    },
+    /// `InstallWorker` reported progress.
+    Progress(ProgressEvent),
+    /// `InstallWorker` finished installation.
+    InstallComplete {
+        /// Version key that was installed.
+        version: String,
+    },
+    /// `InstallWorker` finished uninstallation.
+    UninstallComplete,
+    /// `InstallWorker` reported an error.
+    WorkerError(String),
+    /// User clicked the Add Game button.
+    AddGameRequested,
+    /// User confirmed adding a game via the dialog.
+    GameAdded {
+        /// Display name.
+        name: String,
+        /// Game directory.
+        path: PathBuf,
+        /// Architecture detected or chosen in the dialog.
+        arch: ExeArch,
+    },
+    /// Per-game shader repo toggle forwarded from the detail pane.
+    ShaderToggled {
+        /// Stable game ID.
+        game_id: String,
+        /// Repository local name.
+        repo_name: String,
+        /// New enabled state.
+        enabled: bool,
+    },
+    /// Async startup task detected the install status for a Steam-discovered game.
+    GameStatusDetected {
+        /// Stable game ID.
+        id: String,
+        /// Detected install status.
+        status: InstallStatus,
+    },
+}
+
+/// Dispatch a [`GamesMsg`] to the appropriate handler.
+pub(super) fn handle(model: &mut Window, msg: GamesMsg, root: &adw::ApplicationWindow) {
+    match msg {
+        GamesMsg::GameSelected(id) => handle_game_selected(model, id),
+        GamesMsg::GameRemoveRequested(id) => handle_game_remove(model, id),
+        GamesMsg::Install { game_id, dll, arch, version } => handle_install(model, &game_id, dll, arch, version),
+        GamesMsg::Uninstall { game_id, dll } => handle_uninstall(model, &game_id, dll),
+        GamesMsg::Progress(event) => handle_progress(model, &event),
+        GamesMsg::InstallComplete { version } => handle_install_complete(model, &version),
+        GamesMsg::UninstallComplete => handle_uninstall_complete(model),
+        GamesMsg::WorkerError(e) => handle_worker_error(model, &e),
+        GamesMsg::AddGameRequested => handle_add_game_requested(model, root),
+        GamesMsg::GameAdded { name, path, arch } => handle_game_added(model, name, path, arch),
+        GamesMsg::ShaderToggled { game_id, repo_name, enabled } => handle_shader_toggled(model, &game_id, &repo_name, enabled),
+        GamesMsg::GameStatusDetected { id, status } => handle_game_status_detected(model, id, status),
+    }
+}
+
 /// Navigate to the detail page for the selected game.
 pub(super) fn handle_game_selected(model: &mut Window, id: String) {
     if let Some(game) = model.games.iter().find(|g| g.id == id).cloned() {

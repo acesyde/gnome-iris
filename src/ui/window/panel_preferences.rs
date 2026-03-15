@@ -10,6 +10,35 @@ use crate::ui::{game_detail, game_list, install_worker, preferences};
 
 use super::Window;
 
+/// Messages handled by the Preferences panel.
+#[derive(Debug)]
+pub enum PrefsMsg {
+    /// Preferences emitted a config change; carry updated config.
+    ConfigChanged(GlobalConfig),
+    /// Latest `ReShade` version was fetched from GitHub; forward to Preferences.
+    LatestVersionFetched(String),
+    /// Preferences requested downloading a version to the local cache.
+    VersionDownloadRequested(String),
+    /// Install worker completed a version-only download.
+    VersionDownloadComplete(String),
+    /// Install worker failed a version-only download.
+    VersionDownloadError(String),
+    /// Preferences requested removing a cached version.
+    VersionRemoveRequested(String),
+}
+
+/// Dispatch a [`PrefsMsg`] to the appropriate handler.
+pub(super) fn handle(model: &mut Window, msg: PrefsMsg) {
+    match msg {
+        PrefsMsg::ConfigChanged(config) => handle_config_changed(model, config),
+        PrefsMsg::LatestVersionFetched(version) => handle_latest_version_fetched(model, &version),
+        PrefsMsg::VersionDownloadRequested(version_key) => handle_version_download_requested(model, &version_key),
+        PrefsMsg::VersionDownloadComplete(version) => handle_version_download_complete(model, version),
+        PrefsMsg::VersionDownloadError(e) => handle_version_download_error(model, &e),
+        PrefsMsg::VersionRemoveRequested(version) => handle_version_remove_requested(model, &version),
+    }
+}
+
 /// Persist an updated global config.
 pub(super) fn handle_config_changed(model: &mut Window, config: GlobalConfig) {
     model.app_state.config = config;

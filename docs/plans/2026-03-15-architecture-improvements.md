@@ -125,7 +125,7 @@ All four call sites in `panel_games.rs` and `panel_preferences.rs` use this help
 
 ---
 
-### 6. Slim down the Window `Controls` enum — **Medium effort / high maintainability value**
+### 6. Slim down the Window `Controls` enum — **Medium effort / high maintainability value** ✅ Done
 
 **Problem:** `window/mod.rs` has **64+ Controls variants**. The `update()` function routes them all. This makes
 the root component a god object that is hard to navigate and increasingly risky to extend.
@@ -200,7 +200,7 @@ The Window shows games immediately with `InstallStatus::NotInstalled` as a place
 | 2   | Extract path constants            | S      | Medium | ✅ Yes    |
 | 5   | Surface save errors to user       | S      | High   | ✅ Yes    |
 | 9   | Async startup detection           | S      | Medium | ✅ Done   |
-| 6   | Slim down `Controls` enum         | M      | High   | Next      |
+| 6   | Slim down `Controls` enum         | M      | High   | ✅ Done   |
 | 4   | Typed `Progress` enum             | M      | Medium | ✅ Yes    |
 | 7   | Catalog as data file              | M      | Medium | ✅ Yes    |
 | 8   | Integration tests                 | M      | High   | Next      |

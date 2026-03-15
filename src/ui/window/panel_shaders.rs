@@ -11,6 +11,38 @@ use crate::ui::{shader_catalog, shader_worker};
 
 use super::Window;
 
+/// Messages handled by the Shaders panel.
+#[derive(Debug)]
+pub enum ShadersMsg {
+    /// User requested downloading a shader repo from the catalog.
+    DownloadRequested(ShaderRepo),
+    /// Shader worker reported download progress.
+    Progress(ProgressEvent),
+    /// Shader worker finished syncing a catalog repo.
+    SyncComplete,
+    /// Shader worker reported an error syncing a catalog repo.
+    SyncError(String),
+    /// Shader catalog "+" button clicked — present add-repo dialog.
+    AddCustomRepoRequested,
+    /// User confirmed new custom repo in dialog.
+    RepoAdded(ShaderRepo),
+    /// User clicked the trash button on a custom repo row.
+    RemoveCustomRepoRequested(ShaderRepo),
+}
+
+/// Dispatch a [`ShadersMsg`] to the appropriate handler.
+pub(super) fn handle(model: &mut Window, msg: ShadersMsg, root: &adw::ApplicationWindow) {
+    match msg {
+        ShadersMsg::DownloadRequested(repo) => handle_download_requested(model, repo),
+        ShadersMsg::Progress(event) => handle_progress(model, &event),
+        ShadersMsg::SyncComplete => handle_sync_complete(model),
+        ShadersMsg::SyncError(e) => handle_sync_error(model, e),
+        ShadersMsg::AddCustomRepoRequested => handle_add_custom_repo_requested(model, root),
+        ShadersMsg::RepoAdded(repo) => handle_repo_added(model, repo),
+        ShadersMsg::RemoveCustomRepoRequested(repo) => handle_remove_custom_repo_requested(model, repo),
+    }
+}
+
 /// Dispatch a single-repo sync job to the shader worker.
 pub(super) fn handle_download_requested(model: &Window, repo: ShaderRepo) {
     let data_dir = model.app_state.data_dir.clone();
