@@ -134,6 +134,13 @@ pub enum Controls {
         /// New enabled state.
         enabled: bool,
     },
+    /// Async startup task detected the install status for a Steam-discovered game.
+    GameStatusDetected {
+        /// Stable game ID.
+        id: String,
+        /// Detected install status.
+        status: crate::reshade::game::InstallStatus,
+    },
 }
 
 #[allow(missing_docs)]
@@ -161,9 +168,12 @@ impl Component for Window {
         let app_state = AppState::load();
         let mut games = app_state.games.clone();
         let steam_games = crate::reshade::steam::discover_steam_games();
-        for mut sg in steam_games {
+        // Collect new Steam games without blocking on status detection; detection
+        // runs in the startup async task so the window appears immediately.
+        let mut new_steam_game_paths: Vec<(String, std::path::PathBuf)> = Vec::new();
+        for sg in steam_games {
             if !games.iter().any(|g| g.id == sg.id) {
-                sg.status = detect_install_status(&sg.path);
+                new_steam_game_paths.push((sg.id.clone(), sg.path.clone()));
                 games.push(sg);
             }
         }
@@ -287,6 +297,7 @@ impl Component for Window {
         // Capture values needed for version-check task before app_state is moved.
         let update_interval = app_state.config.update_interval_hours;
         let cache_data_dir = app_state.data_dir.clone();
+        let steam_paths_for_detection = new_steam_game_paths;
 
         // Build ViewStack.
         let view_stack = adw::ViewStack::new();
@@ -430,6 +441,12 @@ impl Component for Window {
                         log::warn!("Could not install d3dcompiler_47.dll: {e}");
                     }
                 }
+
+                // Detect install status for newly discovered Steam games off the main thread.
+                for (id, path) in steam_paths_for_detection {
+                    let status = detect_install_status(&path);
+                    sender.input(Controls::GameStatusDetected { id, status });
+                }
             });
         }
 
@@ -498,6 +515,9 @@ impl Component for Window {
                 enabled,
             } => {
                 panel_games::handle_shader_toggled(self, &game_id, &repo_name, enabled);
+            },
+            Controls::GameStatusDetected { id, status } => {
+                panel_games::handle_game_status_detected(self, id, status);
             },
         }
     }

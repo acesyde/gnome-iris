@@ -165,6 +165,22 @@ pub(super) fn handle_shader_toggled(model: &mut Window, game_id: &str, repo_name
     }
 }
 
+/// Update a game's install status after async startup detection completes.
+pub(super) fn handle_game_status_detected(model: &mut Window, id: String, status: InstallStatus) {
+    if let Some(game) = model.games.iter_mut().find(|g| g.id == id) {
+        game.status = status.clone();
+    }
+    let version = match status {
+        InstallStatus::Installed { version, .. } => version,
+        InstallStatus::NotInstalled => None,
+    };
+    model.game_list.emit(game_list::Controls::SetGameStatus {
+        id,
+        version,
+        latest_version: model.latest_version.clone(),
+    });
+}
+
 /// Persist the new game and add it to the list.
 pub(super) fn handle_game_added(model: &mut Window, name: String, path: PathBuf, arch: ExeArch) {
     let mut game = Game::new(name, path, GameSource::Manual);

@@ -178,7 +178,7 @@ Use `tempfile` (already a dev-dependency) for isolation.
 
 ---
 
-### 9. Defer `detect_install_status()` out of the synchronous UI init path — **Low effort / UX value**
+### 9. Defer `detect_install_status()` out of the synchronous UI init path — **Low effort / UX value** ✅ Done
 
 **Problem:** `Window::init()` calls `detect_install_status()` synchronously for every game before the window
 appears. This does blocking filesystem I/O on the main thread, making startup lag proportional to the number
@@ -199,7 +199,7 @@ The Window shows games immediately with `InstallStatus::NotInstalled` as a place
 | 1   | Deduplicate `parse_version_key()` | XS     | High   | ✅ Yes    |
 | 2   | Extract path constants            | S      | Medium | ✅ Yes    |
 | 5   | Surface save errors to user       | S      | High   | ✅ Yes    |
-| 9   | Async startup detection           | S      | Medium | ✅ Yes    |
+| 9   | Async startup detection           | S      | Medium | ✅ Done   |
 | 6   | Slim down `Controls` enum         | M      | High   | Next      |
 | 4   | Typed `Progress` enum             | M      | Medium | ✅ Yes    |
 | 7   | Catalog as data file              | M      | Medium | ✅ Yes    |
