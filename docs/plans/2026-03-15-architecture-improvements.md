@@ -25,9 +25,10 @@ extend and maintain over time.
 
 ---
 
-### 2. Extract domain path constants — **Quick win / medium value**
+### 2. Extract domain path constants — **Quick win / medium value** ✅ Done
 
 **Problem:** Magic string literals for paths and file names are scattered across modules:
+
 - `"Merged"` — in `shaders.rs`
 - `"ReShade_shaders"` — in `shaders.rs` and `install.rs`
 - `"LVERS"`, `"LASTUPDATED"` — in `cache.rs`
@@ -43,11 +44,13 @@ that all modules import. No path string should appear in more than one place.
 ### 3. Introduce service traits for the domain layer — **Medium effort / high long-term value**
 
 **Problem:** All domain operations are free functions. The UI calls them directly, which:
+
 - Makes the UI layer untestable in isolation.
 - Makes it impossible to swap a mock or alternative implementation.
 - Couples the UI to concrete modules rather than abstractions.
 
 **Fix:** Define traits in `src/reshade/`:
+
 ```rust
 pub trait ReShadeProvider {
     async fn fetch_latest_version(&self) -> Result<String>;
@@ -60,6 +63,7 @@ pub trait GameRepository {
     fn save_games(&mut self, games: &[Game]) -> Result<()>;
 }
 ```
+
 Provide a `DefaultReShadeProvider` and `DefaultGameRepository` that wrap the current free functions.
 Workers and Window receive the trait object (or generic parameter) rather than calling functions directly.
 
@@ -69,12 +73,13 @@ This is groundwork for future unit-testing of UI handlers.
 
 ---
 
-### 4. Replace raw-string progress messages with a typed `Progress` enum — **Medium effort / medium value**
+### 4. Replace raw-string progress messages with a typed `Progress` enum — **Medium effort / medium value** ✅ Done
 
 **Problem:** `InstallWorker` and `ShaderWorker` both emit `Signal::Progress(String)`. The string content is
 ad-hoc and checked nowhere by the compiler. Adding a new progress stage means grepping for string literals.
 
 **Fix:** Define a `ProgressEvent` enum in the domain layer or in a shared `ui/worker_types.rs`:
+
 ```rust
 pub enum ProgressEvent {
     Downloading { version: String, bytes_total: Option<u64>, bytes_done: u64 },
@@ -84,6 +89,7 @@ pub enum ProgressEvent {
     Done,
 }
 ```
+
 Workers emit `Signal::Progress(ProgressEvent)`. The detail pane converts the enum to a localised string for
 display. This decouples progress semantics from presentation.
 
@@ -94,14 +100,17 @@ display. This decouples progress semantics from presentation.
 ### 5. Surface persistence errors to the user — **Medium effort / high UX value**
 
 **Problem:** Every `AppState::save()` call swallows failures with `log::error!()` only:
+
 ```rust
 if let Err(e) = model.app_state.save() {
     log::error!("Failed to save...: {e}");
 }
 ```
+
 The user has no indication that their config or game list was not persisted. Data loss is silent.
 
 **Fix:** Propagate save errors to the Window's `ToastOverlay`. Introduce a helper in `window/mod.rs`:
+
 ```rust
 fn save_or_toast(model: &mut Window, sender: &Sender<Controls>) {
     if let Err(e) = model.app_state.save() {
@@ -109,6 +118,7 @@ fn save_or_toast(model: &mut Window, sender: &Sender<Controls>) {
     }
 }
 ```
+
 All four call sites in `panel_games.rs` and `panel_preferences.rs` use this helper.
 
 **Files:** `src/ui/window/mod.rs`, `src/ui/window/panel_games.rs`, `src/ui/window/panel_preferences.rs`
@@ -121,6 +131,7 @@ All four call sites in `panel_games.rs` and `panel_preferences.rs` use this help
 the root component a god object that is hard to navigate and increasingly risky to extend.
 
 **Fix:** Group variants by domain using nested enums, then flatten in `update()` with a thin match arm:
+
 ```rust
 pub enum Controls {
     Games(GamesMsg),
@@ -129,6 +140,7 @@ pub enum Controls {
     Toast(String),
 }
 ```
+
 Each panel handler file becomes responsible for its own message type. `window/mod.rs::update()` dispatches in
 ~4 lines instead of 64. New features add a variant to the appropriate sub-enum, not to the root.
 
@@ -155,6 +167,7 @@ and deserialise at startup with `serde`. The `CatalogEntry` type stays; only the
 exercise a full flow (e.g., download → extract → install → detect_status → uninstall).
 
 **Fix:** Add `tests/` at the crate root (Rust integration test convention). One file per major flow:
+
 - `tests/install_flow.rs` — download a mock zip, extract, install symlinks, detect status, uninstall
 - `tests/shader_sync.rs` — clone a bare test repo, rebuild merged, verify symlinks
 - `tests/app_state.rs` — load/save roundtrip with full AppState
@@ -181,23 +194,24 @@ The Window shows games immediately with `InstallStatus::NotInstalled` as a place
 
 ## Priority Order
 
-| # | Item | Effort | Value | Do first? |
-|---|------|--------|-------|-----------|
-| 1 | Deduplicate `parse_version_key()` | XS | High | ✅ Yes |
-| 2 | Extract path constants | S | Medium | ✅ Yes |
-| 5 | Surface save errors to user | S | High | ✅ Yes |
-| 9 | Async startup detection | S | Medium | ✅ Yes |
-| 6 | Slim down `Controls` enum | M | High | Next |
-| 4 | Typed `Progress` enum | M | Medium | Next |
-| 7 | Catalog as data file | M | Medium | Next |
-| 8 | Integration tests | M | High | Next |
-| 3 | Service traits | L | High | Later |
+| #   | Item                              | Effort | Value  | Do first? |
+| --- | --------------------------------- | ------ | ------ | --------- |
+| 1   | Deduplicate `parse_version_key()` | XS     | High   | ✅ Yes    |
+| 2   | Extract path constants            | S      | Medium | ✅ Yes    |
+| 5   | Surface save errors to user       | S      | High   | ✅ Yes    |
+| 9   | Async startup detection           | S      | Medium | ✅ Yes    |
+| 6   | Slim down `Controls` enum         | M      | High   | Next      |
+| 4   | Typed `Progress` enum             | M      | Medium | ✅ Yes    |
+| 7   | Catalog as data file              | M      | Medium | Next      |
+| 8   | Integration tests                 | M      | High   | Next      |
+| 3   | Service traits                    | L      | High   | Later     |
 
 ---
 
 ## Verification
 
 For each item, verify with:
+
 ```bash
 mise exec -- cargo check          # type-checks without GTK display
 mise exec -- cargo test           # domain unit tests
@@ -206,6 +220,7 @@ mise exec -- cargo fmt --check    # formatting
 ```
 
 Manual smoke test (requires display):
+
 ```bash
 GSETTINGS_SCHEMA_DIR=./target/share/glib-2.0/schemas mise exec -- cargo run
 ```

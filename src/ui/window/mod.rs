@@ -21,6 +21,7 @@ use crate::ui::install_worker;
 use crate::ui::preferences;
 use crate::ui::shader_catalog;
 use crate::ui::shader_worker;
+use crate::ui::worker_types::ProgressEvent;
 
 /// Root window model.
 pub struct Window {
@@ -80,7 +81,7 @@ pub enum Controls {
         dll: crate::reshade::game::DllOverride,
     },
     /// `InstallWorker` reported progress.
-    Progress(String),
+    Progress(ProgressEvent),
     /// `InstallWorker` finished installation.
     InstallComplete { version: String },
     /// `InstallWorker` finished uninstallation.
@@ -103,7 +104,7 @@ pub enum Controls {
     /// User requested downloading a shader repo from the catalog.
     ShaderDownloadRequested(crate::reshade::config::ShaderRepo),
     /// Shader worker reported download progress.
-    ShaderProgress(String),
+    ShaderProgress(ProgressEvent),
     /// Shader worker finished syncing a catalog repo.
     ShaderSyncComplete,
     /// Shader worker reported an error syncing a catalog repo.
@@ -450,7 +451,7 @@ impl Component for Window {
             Controls::Uninstall { game_id, dll } => {
                 panel_games::handle_uninstall(self, &game_id, dll);
             },
-            Controls::Progress(msg) => panel_games::handle_progress(self, msg),
+            Controls::Progress(msg) => panel_games::handle_progress(self, &msg),
             Controls::InstallComplete { version } => {
                 panel_games::handle_install_complete(self, &version);
             },
@@ -466,7 +467,7 @@ impl Component for Window {
             Controls::ShaderDownloadRequested(repo) => {
                 panel_shaders::handle_download_requested(self, repo);
             },
-            Controls::ShaderProgress(msg) => panel_shaders::handle_progress(self, msg),
+            Controls::ShaderProgress(msg) => panel_shaders::handle_progress(self, &msg),
             Controls::ShaderSyncComplete => panel_shaders::handle_sync_complete(self),
             Controls::ShaderSyncError(e) => panel_shaders::handle_sync_error(self, e),
             Controls::ShaderAddCustomRepoRequested => {

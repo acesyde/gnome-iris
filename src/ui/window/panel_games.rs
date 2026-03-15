@@ -9,6 +9,7 @@ use relm4::adw::prelude::*;
 use crate::reshade::app_state::iris_data_dir;
 use crate::reshade::catalog::KNOWN_REPOS;
 use crate::reshade::game::{DllOverride, ExeArch, Game, GameSource, InstallStatus};
+use crate::ui::worker_types::ProgressEvent;
 use crate::ui::{add_game_dialog, game_detail, game_list, install_worker};
 
 use super::Window;
@@ -71,8 +72,8 @@ pub(super) fn handle_uninstall(model: &Window, game_id: &str, dll: DllOverride) 
 }
 
 /// Forward install worker progress to the detail pane.
-pub(super) fn handle_progress(model: &Window, msg: String) {
-    model.game_detail.emit(game_detail::Controls::SetProgress(msg));
+pub(super) fn handle_progress(model: &Window, event: &ProgressEvent) {
+    model.game_detail.emit(game_detail::Controls::SetProgress(event.to_string()));
 }
 
 /// Clear progress and mark the game as installed.

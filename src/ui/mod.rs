@@ -13,3 +13,4 @@ pub mod preferences;
 pub mod shader_catalog;
 pub mod shader_worker;
 pub mod window;
+pub mod worker_types;

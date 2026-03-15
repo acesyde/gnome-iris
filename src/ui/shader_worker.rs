@@ -6,6 +6,7 @@ use relm4::{ComponentSender, Worker};
 
 use crate::reshade::config::ShaderRepo;
 use crate::reshade::shaders;
+use crate::ui::worker_types::ProgressEvent;
 
 /// Input commands for the shader worker.
 #[derive(Debug)]
@@ -32,7 +33,7 @@ pub enum Controls {
 #[derive(Debug)]
 pub enum Signal {
     /// Currently syncing this repo.
-    Progress(String),
+    Progress(ProgressEvent),
     /// All repos synced and merged successfully.
     Complete,
     /// A non-fatal error on one repo (sync continues with remaining repos).
@@ -72,7 +73,7 @@ impl Worker for ShaderWorker {
                     return;
                 }
                 for repo in &repos {
-                    sender.output(Signal::Progress(format!("Syncing {}...", repo.local_name))).ok();
+                    sender.output(Signal::Progress(ProgressEvent::SyncingRepo { name: repo.local_name.clone() })).ok();
                     if let Err(e) = shaders::sync_repo(repo, &repos_dir) {
                         sender
                             .output(Signal::RepoError {
@@ -94,7 +95,7 @@ impl Worker for ShaderWorker {
                     sender.output(Signal::Error(e.to_string())).ok();
                     return;
                 }
-                sender.output(Signal::Progress(format!("Syncing {}...", repo.local_name))).ok();
+                sender.output(Signal::Progress(ProgressEvent::SyncingRepo { name: repo.local_name.clone() })).ok();
                 match shaders::sync_repo(&repo, &repos_dir) {
                     Ok(()) => sender.output(Signal::Complete).ok(),
                     Err(e) => sender

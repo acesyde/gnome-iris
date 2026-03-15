@@ -8,6 +8,7 @@ use relm4::{ComponentSender, Worker};
 use crate::reshade::cache::UpdateCache;
 use crate::reshade::game::{DllOverride, ExeArch};
 use crate::reshade::{d3dcompiler, install, reshade};
+use crate::ui::worker_types::ProgressEvent;
 
 /// Input commands for the install worker.
 #[derive(Debug)]
@@ -46,8 +47,8 @@ pub enum Controls {
 /// Output signals from the install worker.
 #[derive(Debug)]
 pub enum Signal {
-    /// A step completed — carries a human-readable status message.
-    Progress(String),
+    /// A step completed — carries a typed progress event.
+    Progress(ProgressEvent),
     /// Installation finished successfully.
     InstallComplete {
         /// The installed `ReShade` version string.
@@ -124,7 +125,7 @@ async fn do_download_version(
     sender: &ComponentSender<InstallWorker>,
 ) -> anyhow::Result<()> {
     let dir_key = if addon { format!("{version}-Addon") } else { version.to_owned() };
-    sender.output(Signal::Progress(format!("Downloading ReShade {dir_key}..."))).ok();
+    sender.output(Signal::Progress(ProgressEvent::Downloading { version: dir_key.clone() })).ok();
     let version_dir = reshade::version_dir(data_dir, &dir_key);
     if !version_dir.join(ExeArch::X86_64.reshade_dll()).exists() {
         let url = reshade::download_url(version, addon);
@@ -156,11 +157,11 @@ fn do_install(
     }
 
     if !d3dcompiler::is_installed(data_dir, arch) {
-        sender.output(Signal::Progress("Installing d3dcompiler_47.dll...".into())).ok();
+        sender.output(Signal::Progress(ProgressEvent::InstallingD3dcompiler)).ok();
     }
     d3dcompiler::ensure(data_dir, arch).context("Failed to install d3dcompiler_47.dll")?;
 
-    sender.output(Signal::Progress("Installing...".into())).ok();
+    sender.output(Signal::Progress(ProgressEvent::Installing)).ok();
     install::install_reshade(data_dir, game_dir, version, dll, arch)?;
 
     // cache.add_installed intentionally omitted: the version is already

@@ -6,6 +6,7 @@ use relm4::adw::prelude::*;
 
 use crate::fl;
 use crate::reshade::config::ShaderRepo;
+use crate::ui::worker_types::ProgressEvent;
 use crate::ui::{shader_catalog, shader_worker};
 
 use super::Window;
@@ -17,8 +18,8 @@ pub(super) fn handle_download_requested(model: &Window, repo: ShaderRepo) {
 }
 
 /// Forward shader worker progress to the catalog.
-pub(super) fn handle_progress(model: &Window, msg: String) {
-    model.shader_catalog.emit(shader_catalog::Controls::SyncProgress(msg));
+pub(super) fn handle_progress(model: &Window, event: &ProgressEvent) {
+    model.shader_catalog.emit(shader_catalog::Controls::SyncProgress(event.to_string()));
 }
 
 /// Notify the catalog that a sync completed.
