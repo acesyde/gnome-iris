@@ -19,10 +19,10 @@ pub(super) fn handle_game_selected(model: &mut Window, id: String) {
     if let Some(game) = model.games.iter().find(|g| g.id == id).cloned() {
         model.game_detail.emit(game_detail::Controls::SetGame(game.clone()));
         let repos_dir = model.app_state.data_dir.join("ReShade_shaders");
-        let known_names: std::collections::HashSet<&str> = KNOWN_REPOS.iter().map(|e| e.local_name).collect();
+        let known_names: std::collections::HashSet<&str> = KNOWN_REPOS.iter().map(|e| e.local_name.as_str()).collect();
         let downloaded_repos = KNOWN_REPOS
             .iter()
-            .filter(|e| repos_dir.join(e.local_name).is_dir())
+            .filter(|e| repos_dir.join(&e.local_name).is_dir())
             .map(crate::reshade::catalog::CatalogEntry::to_shader_repo)
             .chain(
                 model

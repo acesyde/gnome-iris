@@ -110,8 +110,8 @@ impl SimpleComponent for ShaderCatalog {
 
         let mut installed: HashSet<String> = KNOWN_REPOS
             .iter()
-            .filter(|e| repos_dir.join(e.local_name).is_dir())
-            .map(|e| e.local_name.to_owned())
+            .filter(|e| repos_dir.join(&e.local_name).is_dir())
+            .map(|e| e.local_name.clone())
             .collect();
         for repo in &init.custom_repos {
             if repos_dir.join(&repo.local_name).is_dir() {
@@ -135,12 +135,12 @@ impl SimpleComponent for ShaderCatalog {
         model.custom_group = widgets.custom_group.clone();
 
         // Build one ActionRow per catalog entry.
-        for entry in KNOWN_REPOS {
+        for entry in KNOWN_REPOS.iter() {
             let row = adw::ActionRow::new();
-            row.set_title(entry.name);
-            row.set_subtitle(entry.description);
+            row.set_title(&entry.name);
+            row.set_subtitle(&entry.description);
 
-            let (icon, tip) = if model.installed.contains(entry.local_name) {
+            let (icon, tip) = if model.installed.contains(entry.local_name.as_str()) {
                 ("view-refresh-symbolic", fl!("redownload"))
             } else {
                 ("folder-download-symbolic", fl!("download"))
@@ -162,8 +162,8 @@ impl SimpleComponent for ShaderCatalog {
             sync_stack.add_named(&spinner, Some("spinner"));
             row.add_suffix(&sync_stack);
 
-            model.row_buttons.insert(entry.local_name.to_owned(), btn);
-            model.row_spinners.insert(entry.local_name.to_owned(), spinner);
+            model.row_buttons.insert(entry.local_name.clone(), btn);
+            model.row_spinners.insert(entry.local_name.clone(), spinner);
 
             widgets.catalog_group.add(&row);
         }
@@ -223,8 +223,8 @@ impl SimpleComponent for ShaderCatalog {
                 if self.syncing.is_some() {
                     return; // one download at a time
                 }
-                self.syncing = Some(entry.local_name.to_owned());
-                begin_sync(entry.local_name, &self.row_buttons, &self.row_spinners);
+                self.syncing = Some(entry.local_name.clone());
+                begin_sync(&entry.local_name, &self.row_buttons, &self.row_spinners);
                 sender.output(Signal::DownloadRequested(entry.to_shader_repo())).ok();
             },
             Controls::DownloadAll => {
@@ -232,8 +232,8 @@ impl SimpleComponent for ShaderCatalog {
                     return;
                 }
                 self.download_queue.clear();
-                for entry in KNOWN_REPOS {
-                    if !self.installed.contains(entry.local_name) {
+                for entry in KNOWN_REPOS.iter() {
+                    if !self.installed.contains(entry.local_name.as_str()) {
                         self.download_queue.push_back(entry.to_shader_repo());
                     }
                 }

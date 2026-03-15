@@ -1,0 +1,321 @@
+[
+  {
+    "name": "crosire / reshade-shaders",
+    "description": "Official ReShade shader collection (slim branch)",
+    "local_name": "reshade-shaders",
+    "url": "https://github.com/crosire/reshade-shaders",
+    "branch": "slim"
+  },
+  {
+    "name": "Marty McFly / qUINT",
+    "description": "MXAO, ADOF, Screen Space Reflection, Bloom, Sharpen, Lightroom",
+    "local_name": "martymc-shaders",
+    "url": "https://github.com/martymcmodding/qUINT"
+  },
+  {
+    "name": "CeeJayDK / SweetFX",
+    "description": "Classic post-processing suite",
+    "local_name": "sweetfx-shaders",
+    "url": "https://github.com/CeeJayDK/SweetFX"
+  },
+  {
+    "name": "BlueSkyDefender / AstrayFX",
+    "description": "AstrayFX effect collection",
+    "local_name": "astrayfx-shaders",
+    "url": "https://github.com/BlueSkyDefender/AstrayFX"
+  },
+  {
+    "name": "prod80 / prod80-ReShade-Repository",
+    "description": "DOF, Flares, Bloom, Tonemapping, Sharpening",
+    "local_name": "prod80-shaders",
+    "url": "https://github.com/prod80/prod80-ReShade-Repository"
+  },
+  {
+    "name": "FransBouma / OtisFX",
+    "description": "Cinematic DOF, Emphasize, Adaptive Fog",
+    "local_name": "otisfx-shaders",
+    "url": "https://github.com/FransBouma/OtisFX"
+  },
+  {
+    "name": "Fubaxiusz / fubax-shaders",
+    "description": "Perfect Perspective, Chromakey, Filmic Anamorphic Sharpen",
+    "local_name": "fubax-shaders",
+    "url": "https://github.com/Fubaxiusz/fubax-shaders"
+  },
+  {
+    "name": "Daodan317081 / reshade-shaders",
+    "description": "Color Isolation, AspectRatio, Hotsampling Helper, Comic",
+    "local_name": "daodan-shaders",
+    "url": "https://github.com/Daodan317081/reshade-shaders"
+  },
+  {
+    "name": "luluco250 / FXShaders",
+    "description": "Arcane Bloom, Magic Bloom, Mat Cap, Hex Lens Flare",
+    "local_name": "fxshaders",
+    "url": "https://github.com/luluco250/FXShaders"
+  },
+  {
+    "name": "brussell1 / Shaders",
+    "description": "Fake DOF, Eye Adaptation",
+    "local_name": "brussell-shaders",
+    "url": "https://github.com/brussell1/Shaders"
+  },
+  {
+    "name": "guestrr / ReshadeShaders",
+    "description": "Bumpmapping, Deblur, Fast Sharpen",
+    "local_name": "guestrr-shaders",
+    "url": "https://github.com/guestrr/ReshadeShaders"
+  },
+  {
+    "name": "Zackin5 / Filmic-Tonemapping-ReShade",
+    "description": "Filmic tonemap shaders (Hejl ALU, Reinhard, Uncharted)",
+    "local_name": "filmic-tonemapping-shaders",
+    "url": "https://github.com/Zackin5/Filmic-Tonemapping-ReShade"
+  },
+  {
+    "name": "Matsilagi / reshade-retroarch-shaders",
+    "description": "Ported Retroarch shaders (mostly CRT)",
+    "local_name": "retroarch-shaders",
+    "url": "https://github.com/Matsilagi/reshade-retroarch-shaders"
+  },
+  {
+    "name": "Matsilagi / reshade-shadertoy-shaders",
+    "description": "Ported Shadertoy shaders",
+    "local_name": "shadertoy-shaders",
+    "url": "https://github.com/Matsilagi/reshade-shadertoy-shaders"
+  },
+  {
+    "name": "Matsilagi / reshade-unity-shaders",
+    "description": "Ported Unity Asset shaders (VHS, Ditherpack, RetroTV)",
+    "local_name": "unity-shaders",
+    "url": "https://github.com/Matsilagi/reshade-unity-shaders"
+  },
+  {
+    "name": "dddfault / NativeEnhancer-FE-DX10",
+    "description": "Film Simulation LUT Pack (DX10/DX11)",
+    "local_name": "nativeenhancer-shaders",
+    "url": "https://github.com/dddfault/NativeEnhancer-FE-DX10"
+  },
+  {
+    "name": "JakobPCoder / ReShadeTFAA",
+    "description": "Temporal anti-aliasing for ReShade",
+    "local_name": "reshade-tfaa",
+    "url": "https://github.com/JakobPCoder/ReshadeTFAA"
+  },
+  {
+    "name": "Marty McFly / iMMERSE",
+    "description": "Advanced effects: MXAO, Launchpad, Sharpen",
+    "local_name": "immerse",
+    "url": "https://github.com/martymcmodding/iMMERSE"
+  },
+  {
+    "name": "Marty McFly / METEOR",
+    "description": "Motion estimation and temporal effects",
+    "local_name": "meteor",
+    "url": "https://github.com/martymcmodding/METEOR"
+  },
+  {
+    "name": "BlueSkyDefender / Depth3D",
+    "description": "Stereo 3D depth effects",
+    "local_name": "depth3d",
+    "url": "https://github.com/BlueSkyDefender/Depth3D"
+  },
+  {
+    "name": "Heathen / Pirate-Shaders",
+    "description": "Various post-processing effects",
+    "local_name": "pirate-shaders",
+    "url": "https://github.com/Heathen/Pirate-Shaders"
+  },
+  {
+    "name": "Originalnicodr / CorgiFX",
+    "description": "Creative post-processing effects",
+    "local_name": "corgifx",
+    "url": "https://github.com/Originalnicodr/CorgiFX"
+  },
+  {
+    "name": "TheGordinho / MLUT",
+    "description": "Multi-LUT color grading collection",
+    "local_name": "mlut",
+    "url": "https://github.com/TheGordinho/MLUT"
+  },
+  {
+    "name": "LordOfLunacy / Insane-Shaders",
+    "description": "Experimental and advanced shader effects",
+    "local_name": "insane-shaders",
+    "url": "https://github.com/LordOfLunacy/Insane-Shaders"
+  },
+  {
+    "name": "Matsilagi / RSRetroArch",
+    "description": "RetroArch shaders ported to ReShade",
+    "local_name": "rsretroarch",
+    "url": "https://github.com/Matsilagi/RSRetroArch"
+  },
+  {
+    "name": "MadCake / reshade-shaders",
+    "description": "Shader collection by MadCake",
+    "local_name": "madcake-shaders",
+    "url": "https://github.com/KosRud/Shaders"
+  },
+  {
+    "name": "SirCobra / CobraFX",
+    "description": "Shader collection by SirCobra",
+    "local_name": "cobrafx",
+    "url": "https://github.com/LordKobra/CobraFX"
+  },
+  {
+    "name": "Radegast001 / Warp-FX",
+    "description": "Warp and distortion effects",
+    "local_name": "warp-fx",
+    "url": "https://github.com/Radegast-FFXIV/Warp-FX"
+  },
+  {
+    "name": "fish-m-n / VRToolkit",
+    "description": "VR-optimized shader toolkit",
+    "local_name": "vrtoolkit",
+    "url": "https://github.com/retroluxfilm/reshade-vrtoolkit"
+  },
+  {
+    "name": "AlucardDH / dh-reshade-shaders",
+    "description": "Shader collection by AlucardDH",
+    "local_name": "dh-reshade-shaders",
+    "url": "https://github.com/AlucardDH/dh-reshade-shaders"
+  },
+  {
+    "name": "rj200 / Glamayre Fast Effects",
+    "description": "Fast ambient occlusion, anti-aliasing and image enhancement",
+    "local_name": "glamayre",
+    "url": "https://github.com/rj200/Glamarye_Fast_Effects_for_ReShade"
+  },
+  {
+    "name": "mj-ehsan / NiceGuy-Shaders",
+    "description": "Ray-tracing inspired effects",
+    "local_name": "niceguy-shaders",
+    "url": "https://github.com/mj-ehsan/NiceGuy-Shaders"
+  },
+  {
+    "name": "papadanku / CShade",
+    "description": "Cross-platform shader library",
+    "local_name": "cshade",
+    "url": "https://github.com/papadanku/CShade"
+  },
+  {
+    "name": "akgunter / crt-royale-reshade",
+    "description": "CRT display emulation",
+    "local_name": "crt-royale-reshade",
+    "url": "https://github.com/akgunter/crt-royale-reshade"
+  },
+  {
+    "name": "vortigen11 / vort_Shaders",
+    "description": "Various shader effects by vortigen",
+    "local_name": "vort-shaders",
+    "url": "https://github.com/vortigern11/vort_Shaders"
+  },
+  {
+    "name": "Zenteon / ZN_FX",
+    "description": "Effects collection by Zenteon",
+    "local_name": "zn-fx",
+    "url": "https://github.com/Zenteon/ZN_FX"
+  },
+  {
+    "name": "smolbbsoop / smolbbsoopshaders",
+    "description": "Shader collection by smolbbsoop",
+    "local_name": "smolbbsoop-shaders",
+    "url": "https://github.com/smolbbsoop/smolbbsoopshaders"
+  },
+  {
+    "name": "AlexTuduran / FGFX",
+    "description": "Fine graphics effects",
+    "local_name": "fgfx",
+    "url": "https://github.com/AlexTuduran/FGFX"
+  },
+  {
+    "name": "Lilium23 / ReShade_HDR_shaders",
+    "description": "HDR shader effects",
+    "local_name": "reshade-hdr-shaders",
+    "url": "https://github.com/EndlesslyFlowering/ReShade_HDR_shaders"
+  },
+  {
+    "name": "Otis_Inf",
+    "description": "A small set of effects for Reshade",
+    "local_name": "ostis-fx",
+    "url": "https://github.com/FransBouma/OtisFX"
+  },
+  {
+    "name": "BX-Shade",
+    "description": "Some ReShade Shaders made by BarricadeMKXX",
+    "local_name": "bx-shade",
+    "url": "https://github.com/liuxd17thu/BX-Shade"
+  },
+  {
+    "name": "SHADERDECK",
+    "description": "Various Shaders by TreyM for ReShade",
+    "local_name": "shaderdeck",
+    "url": "https://github.com/IAmTreyM/SHADERDECK"
+  },
+  {
+    "name": "Ann-ReShade",
+    "description": "A set of shaders made by AnastasiaGals",
+    "local_name": "ann-reshade",
+    "url": "https://github.com/AnastasiaGals/Ann-ReShade"
+  },
+  {
+    "name": "PumboAutoHDR",
+    "description": "Advanced ReShade AutoHDR",
+    "local_name": "pumboautohdr",
+    "url": "https://github.com/Filoppi/PumboAutoHDR"
+  },
+  {
+    "name": "Ptho-FX",
+    "description": "A collection of shaders for ReShade by PthoEastCoast",
+    "local_name": "ptho-fx",
+    "url": "https://github.com/PthoEastCoast/Ptho-FX"
+  },
+  {
+    "name": "QuarkFX",
+    "description": "Quark is a repository of efficient and high quality shaders meant to adhere closely to physical methods while maintaining a consistent artistic vision, and ignoring the restricting limitations of DirectX9.",
+    "local_name": "quarkfx",
+    "url": "https://github.com/Zenteon/QuarkFX"
+  },
+  {
+    "name": "potatoFX",
+    "description": "A collection of HDR compatible reshade shaders.",
+    "local_name": "potatofx",
+    "url": "https://github.com/GimleLarpes/potatoFX"
+  },
+  {
+    "name": "The Anagrama collection",
+    "description": "A collection of HDR compatible reshade shaders.",
+    "local_name": "nullfrctl-reshade-shaders",
+    "url": "https://github.com/nullfrctl/reshade-shaders"
+  },
+  {
+    "name": "ReshadeSimpleHDRShaders",
+    "description": "Reshade HDR-Compatible shaders that focus on eye-candy effects and basic adjustments",
+    "local_name": "reshadesimplehdrshaders",
+    "url": "https://github.com/MaxG2D/ReshadeSimpleHDRShaders"
+  },
+  {
+    "name": "BB Shaders",
+    "description": "ReShade shaders for visual enhancements, including anti-aliasing, ambient occlusion, global illumination, bloom, color grading, and other post-processing effects.",
+    "local_name": "bb-shaders",
+    "url": "https://github.com/BarbatosBachiko/Reshade-Shaders"
+  },
+  {
+    "name": "UjelFX-ReShade-Effect-Pack",
+    "description": "Effects that took way too long to make. Made for and around HL2.",
+    "local_name": "ujelfx-reshade-effect-pack",
+    "url": "https://github.com/yplebedev/UjelFX-ReShade-Effect-Pack-by-BFB"
+  },
+  {
+    "name": "AS-StageFX",
+    "description": "Dynamic stage lighting & atmospheric effects for ReShade. Features audio reactivity, spotlights, light walls and other effects.",
+    "local_name": "as-stagefx",
+    "url": "https://github.com/LeonAquitaine/as-stagefx"
+  },
+  {
+    "name": "Garamond's ReShade Shaders",
+    "description": "ReShade effects, addons and GraphicalUpgrades for games.",
+    "local_name": "garamond-reshade-shaders",
+    "url": "https://github.com/garamond13/ReShade-shaders"
+  }
+]

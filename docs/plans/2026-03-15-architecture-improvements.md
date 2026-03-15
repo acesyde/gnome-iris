@@ -149,7 +149,7 @@ Each panel handler file becomes responsible for its own message type. `window/mo
 
 ---
 
-### 7. Move `catalog.rs` static data to an embedded data file — **Low effort / medium evolvability value**
+### 7. Move `catalog.rs` static data to an embedded data file — **Low effort / medium evolvability value** ✅ Done
 
 **Problem:** `src/reshade/catalog.rs` is 406 lines of hand-written Rust `CatalogEntry` structs for 45 shader
 repos. Adding or updating a repo requires a Rust recompile and a code change.
@@ -202,7 +202,7 @@ The Window shows games immediately with `InstallStatus::NotInstalled` as a place
 | 9   | Async startup detection           | S      | Medium | ✅ Yes    |
 | 6   | Slim down `Controls` enum         | M      | High   | Next      |
 | 4   | Typed `Progress` enum             | M      | Medium | ✅ Yes    |
-| 7   | Catalog as data file              | M      | Medium | Next      |
+| 7   | Catalog as data file              | M      | Medium | ✅ Yes    |
 | 8   | Integration tests                 | M      | High   | Next      |
 | 3   | Service traits                    | L      | High   | Later     |
 

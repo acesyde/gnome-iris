@@ -1,406 +1,50 @@
 //! Curated list of known `ReShade` shader repositories.
+//!
+//! The catalog data lives in `data/catalog.json` and is embedded into the
+//! binary at compile time. Editing that file is all that is needed to add,
+//! remove, or update a repository — no Rust recompile of this module is
+//! required beyond the normal incremental rebuild triggered by file changes.
+
+use std::sync::LazyLock;
+
+use serde::Deserialize;
 
 use crate::reshade::config::ShaderRepo;
 
 /// A known shader repository from the community catalog.
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 #[allow(clippy::module_name_repetitions)]
 pub struct CatalogEntry {
     /// Display name shown in the Shaders tab.
-    pub name: &'static str,
+    pub name: String,
     /// Short description of the shaders included.
-    pub description: &'static str,
+    pub description: String,
     /// Local directory name under `ReShade_shaders/`.
-    pub local_name: &'static str,
+    pub local_name: String,
     /// Remote HTTPS URL.
-    pub url: &'static str,
+    pub url: String,
     /// Optional branch; `None` clones the default branch.
-    pub branch: Option<&'static str>,
+    #[serde(default)]
+    pub branch: Option<String>,
 }
 
 impl CatalogEntry {
     /// Converts this catalog entry into a [`ShaderRepo`] suitable for syncing.
+    #[must_use]
     pub fn to_shader_repo(&self) -> ShaderRepo {
         ShaderRepo {
-            url: self.url.to_owned(),
-            local_name: self.local_name.to_owned(),
-            branch: self.branch.map(str::to_owned),
+            url: self.url.clone(),
+            local_name: self.local_name.clone(),
+            branch: self.branch.clone(),
             enabled_by_default: false,
         }
     }
 }
 
 /// All known shader repositories, in display order.
-pub static KNOWN_REPOS: &[CatalogEntry] = &[
-    CatalogEntry {
-        name: "crosire / reshade-shaders",
-        description: "Official ReShade shader collection (slim branch)",
-        local_name: "reshade-shaders",
-        url: "https://github.com/crosire/reshade-shaders",
-        branch: Some("slim"),
-    },
-    CatalogEntry {
-        name: "Marty McFly / qUINT",
-        description: "MXAO, ADOF, Screen Space Reflection, Bloom, Sharpen, Lightroom",
-        local_name: "martymc-shaders",
-        url: "https://github.com/martymcmodding/qUINT",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "CeeJayDK / SweetFX",
-        description: "Classic post-processing suite",
-        local_name: "sweetfx-shaders",
-        url: "https://github.com/CeeJayDK/SweetFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "BlueSkyDefender / AstrayFX",
-        description: "AstrayFX effect collection",
-        local_name: "astrayfx-shaders",
-        url: "https://github.com/BlueSkyDefender/AstrayFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "prod80 / prod80-ReShade-Repository",
-        description: "DOF, Flares, Bloom, Tonemapping, Sharpening",
-        local_name: "prod80-shaders",
-        url: "https://github.com/prod80/prod80-ReShade-Repository",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "FransBouma / OtisFX",
-        description: "Cinematic DOF, Emphasize, Adaptive Fog",
-        local_name: "otisfx-shaders",
-        url: "https://github.com/FransBouma/OtisFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Fubaxiusz / fubax-shaders",
-        description: "Perfect Perspective, Chromakey, Filmic Anamorphic Sharpen",
-        local_name: "fubax-shaders",
-        url: "https://github.com/Fubaxiusz/fubax-shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Daodan317081 / reshade-shaders",
-        description: "Color Isolation, AspectRatio, Hotsampling Helper, Comic",
-        local_name: "daodan-shaders",
-        url: "https://github.com/Daodan317081/reshade-shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "luluco250 / FXShaders",
-        description: "Arcane Bloom, Magic Bloom, Mat Cap, Hex Lens Flare",
-        local_name: "fxshaders",
-        url: "https://github.com/luluco250/FXShaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "brussell1 / Shaders",
-        description: "Fake DOF, Eye Adaptation",
-        local_name: "brussell-shaders",
-        url: "https://github.com/brussell1/Shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "guestrr / ReshadeShaders",
-        description: "Bumpmapping, Deblur, Fast Sharpen",
-        local_name: "guestrr-shaders",
-        url: "https://github.com/guestrr/ReshadeShaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Zackin5 / Filmic-Tonemapping-ReShade",
-        description: "Filmic tonemap shaders (Hejl ALU, Reinhard, Uncharted)",
-        local_name: "filmic-tonemapping-shaders",
-        url: "https://github.com/Zackin5/Filmic-Tonemapping-ReShade",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Matsilagi / reshade-retroarch-shaders",
-        description: "Ported Retroarch shaders (mostly CRT)",
-        local_name: "retroarch-shaders",
-        url: "https://github.com/Matsilagi/reshade-retroarch-shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Matsilagi / reshade-shadertoy-shaders",
-        description: "Ported Shadertoy shaders",
-        local_name: "shadertoy-shaders",
-        url: "https://github.com/Matsilagi/reshade-shadertoy-shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Matsilagi / reshade-unity-shaders",
-        description: "Ported Unity Asset shaders (VHS, Ditherpack, RetroTV)",
-        local_name: "unity-shaders",
-        url: "https://github.com/Matsilagi/reshade-unity-shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "dddfault / NativeEnhancer-FE-DX10",
-        description: "Film Simulation LUT Pack (DX10/DX11)",
-        local_name: "nativeenhancer-shaders",
-        url: "https://github.com/dddfault/NativeEnhancer-FE-DX10",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "JakobPCoder / ReShadeTFAA",
-        description: "Temporal anti-aliasing for ReShade",
-        local_name: "reshade-tfaa",
-        url: "https://github.com/JakobPCoder/ReshadeTFAA",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Marty McFly / iMMERSE",
-        description: "Advanced effects: MXAO, Launchpad, Sharpen",
-        local_name: "immerse",
-        url: "https://github.com/martymcmodding/iMMERSE",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Marty McFly / METEOR",
-        description: "Motion estimation and temporal effects",
-        local_name: "meteor",
-        url: "https://github.com/martymcmodding/METEOR",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "BlueSkyDefender / Depth3D",
-        description: "Stereo 3D depth effects",
-        local_name: "depth3d",
-        url: "https://github.com/BlueSkyDefender/Depth3D",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Heathen / Pirate-Shaders",
-        description: "Various post-processing effects",
-        local_name: "pirate-shaders",
-        url: "https://github.com/Heathen/Pirate-Shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Originalnicodr / CorgiFX",
-        description: "Creative post-processing effects",
-        local_name: "corgifx",
-        url: "https://github.com/Originalnicodr/CorgiFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "TheGordinho / MLUT",
-        description: "Multi-LUT color grading collection",
-        local_name: "mlut",
-        url: "https://github.com/TheGordinho/MLUT",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "LordOfLunacy / Insane-Shaders",
-        description: "Experimental and advanced shader effects",
-        local_name: "insane-shaders",
-        url: "https://github.com/LordOfLunacy/Insane-Shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Matsilagi / RSRetroArch",
-        description: "RetroArch shaders ported to ReShade",
-        local_name: "rsretroarch",
-        url: "https://github.com/Matsilagi/RSRetroArch",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "MadCake / reshade-shaders",
-        description: "Shader collection by MadCake",
-        local_name: "madcake-shaders",
-        url: "https://github.com/KosRud/Shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "SirCobra / CobraFX",
-        description: "Shader collection by SirCobra",
-        local_name: "cobrafx",
-        url: "https://github.com/LordKobra/CobraFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Radegast001 / Warp-FX",
-        description: "Warp and distortion effects",
-        local_name: "warp-fx",
-        url: "https://github.com/Radegast-FFXIV/Warp-FX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "fish-m-n / VRToolkit",
-        description: "VR-optimized shader toolkit",
-        local_name: "vrtoolkit",
-        url: "https://github.com/retroluxfilm/reshade-vrtoolkit",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "AlucardDH / dh-reshade-shaders",
-        description: "Shader collection by AlucardDH",
-        local_name: "dh-reshade-shaders",
-        url: "https://github.com/AlucardDH/dh-reshade-shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "rj200 / Glamayre Fast Effects",
-        description: "Fast ambient occlusion, anti-aliasing and image enhancement",
-        local_name: "glamayre",
-        url: "https://github.com/rj200/Glamarye_Fast_Effects_for_ReShade",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "mj-ehsan / NiceGuy-Shaders",
-        description: "Ray-tracing inspired effects",
-        local_name: "niceguy-shaders",
-        url: "https://github.com/mj-ehsan/NiceGuy-Shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "papadanku / CShade",
-        description: "Cross-platform shader library",
-        local_name: "cshade",
-        url: "https://github.com/papadanku/CShade",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "akgunter / crt-royale-reshade",
-        description: "CRT display emulation",
-        local_name: "crt-royale-reshade",
-        url: "https://github.com/akgunter/crt-royale-reshade",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "vortigen11 / vort_Shaders",
-        description: "Various shader effects by vortigen",
-        local_name: "vort-shaders",
-        url: "https://github.com/vortigern11/vort_Shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Zenteon / ZN_FX",
-        description: "Effects collection by Zenteon",
-        local_name: "zn-fx",
-        url: "https://github.com/Zenteon/ZN_FX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "smolbbsoop / smolbbsoopshaders",
-        description: "Shader collection by smolbbsoop",
-        local_name: "smolbbsoop-shaders",
-        url: "https://github.com/smolbbsoop/smolbbsoopshaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "AlexTuduran / FGFX",
-        description: "Fine graphics effects",
-        local_name: "fgfx",
-        url: "https://github.com/AlexTuduran/FGFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Lilium23 / ReShade_HDR_shaders",
-        description: "HDR shader effects",
-        local_name: "reshade-hdr-shaders",
-        url: "https://github.com/EndlesslyFlowering/ReShade_HDR_shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Otis_Inf",
-        description: "A small set of effects for Reshade",
-        local_name: "ostis-fx",
-        url: "https://github.com/FransBouma/OtisFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "BX-Shade",
-        description: "Some ReShade Shaders made by BarricadeMKXX",
-        local_name: "bx-shade",
-        url: "https://github.com/liuxd17thu/BX-Shade",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "SHADERDECK",
-        description: "Various Shaders by TreyM for ReShade",
-        local_name: "shaderdeck",
-        url: "https://github.com/IAmTreyM/SHADERDECK",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Ann-ReShade",
-        description: "A set of shaders made by AnastasiaGals",
-        local_name: "ann-reshade",
-        url: "https://github.com/AnastasiaGals/Ann-ReShade",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "PumboAutoHDR",
-        description: "Advanced ReShade AutoHDR",
-        local_name: "pumboautohdr",
-        url: "https://github.com/Filoppi/PumboAutoHDR",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Ptho-FX",
-        description: "A collection of shaders for ReShade by PthoEastCoast",
-        local_name: "ptho-fx",
-        url: "https://github.com/PthoEastCoast/Ptho-FX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "QuarkFX",
-        description: "Quark is a repository of efficient and high quality shaders meant to adhere closely to physical methods while maintaining a consistent artistic vision, and ignoring the restricting limitations of DirectX9.",
-        local_name: "quarkfx",
-        url: "https://github.com/Zenteon/QuarkFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "potatoFX",
-        description: "A collection of HDR compatible reshade shaders.",
-        local_name: "potatofx",
-        url: "https://github.com/GimleLarpes/potatoFX",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "The Anagrama collection",
-        description: "A collection of HDR compatible reshade shaders.",
-        local_name: "nullfrctl-reshade-shaders",
-        url: "https://github.com/nullfrctl/reshade-shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "ReshadeSimpleHDRShaders",
-        description: "Reshade HDR-Compatible shaders that focus on eye-candy effects and basic adjustments",
-        local_name: "reshadesimplehdrshaders",
-        url: "https://github.com/MaxG2D/ReshadeSimpleHDRShaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "BB Shaders",
-        description: "ReShade shaders for visual enhancements, including anti-aliasing, ambient occlusion, global illumination, bloom, color grading, and other post-processing effects.",
-        local_name: "bb-shaders",
-        url: "https://github.com/BarbatosBachiko/Reshade-Shaders",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "UjelFX-ReShade-Effect-Pack",
-        description: "Effects that took way too long to make. Made for and around HL2.",
-        local_name: "ujelfx-reshade-effect-pack",
-        url: "https://github.com/yplebedev/UjelFX-ReShade-Effect-Pack-by-BFB",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "AS-StageFX",
-        description: "Dynamic stage lighting &amp; atmospheric effects for ReShade. Features audio reactivity, spotlights, light walls and other effects.",
-        local_name: "as-stagefx",
-        url: "https://github.com/LeonAquitaine/as-stagefx",
-        branch: None,
-    },
-    CatalogEntry {
-        name: "Garamond's ReShade Shaders",
-        description: "ReShade effects, addons and GraphicalUpgrades for games.",
-        local_name: "garamond-reshade-shaders",
-        url: "https://github.com/garamond13/ReShade-shaders",
-        branch: None,
-    },
-];
+///
+/// Loaded from the embedded `data/catalog.json` asset on first access.
+pub static KNOWN_REPOS: LazyLock<Vec<CatalogEntry>> = LazyLock::new(|| {
+    let json = include_str!("../../data/catalog.json");
+    serde_json::from_str(json).expect("data/catalog.json is invalid — this is a compile-time asset")
+});

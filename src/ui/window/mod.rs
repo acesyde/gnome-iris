@@ -239,7 +239,7 @@ impl Component for Window {
         );
 
         let known_names: std::collections::HashSet<&str> =
-            crate::reshade::catalog::KNOWN_REPOS.iter().map(|e| e.local_name).collect();
+            crate::reshade::catalog::KNOWN_REPOS.iter().map(|e| e.local_name.as_str()).collect();
         let custom_repos: Vec<_> = app_state
             .config
             .shader_repos

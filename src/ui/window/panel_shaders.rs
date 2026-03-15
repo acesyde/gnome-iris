@@ -59,7 +59,7 @@ pub(super) fn handle_remove_custom_repo_requested(model: &mut Window, repo: Shad
 pub(super) fn handle_repo_added(model: &mut Window, repo: ShaderRepo) {
     let in_catalog = crate::reshade::catalog::KNOWN_REPOS
         .iter()
-        .any(|e| e.url == repo.url || e.local_name == repo.local_name);
+        .any(|e| e.url.as_str() == repo.url || e.local_name.as_str() == repo.local_name);
     if in_catalog {
         model.toast_overlay.add_toast(adw::Toast::new(&fl!("toast-repo-in-catalog")));
         return;
