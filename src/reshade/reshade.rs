@@ -103,7 +103,7 @@ pub fn version_dir(base: &Path, version: &str) -> PathBuf {
 /// Parses a version key (e.g. `"6.7.3"` or `"6.7.3-Addon"`) into a sortable tuple.
 ///
 /// The `-Addon` suffix sorts after the base version of the same number.
-fn parse_version_key(s: &str) -> ((u64, u64, u64), bool) {
+pub(crate) fn parse_version_key(s: &str) -> ((u64, u64, u64), bool) {
     let addon = s.ends_with("-Addon");
     let base = s.strip_suffix("-Addon").unwrap_or(s);
     let mut parts = base.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));

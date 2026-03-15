@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+use super::reshade::parse_version_key;
+
 /// Persisted version and update state for `ReShade`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct VersionState {
@@ -15,16 +17,6 @@ pub struct VersionState {
     /// Locally installed versions, sorted in ascending semver order.
     #[serde(default)]
     pub installed: Vec<String>,
-}
-
-/// Parses a version key (e.g. `"6.7.3"` or `"6.7.3-Addon"`) into a sortable tuple.
-///
-/// The `-Addon` suffix sorts after the base version of the same number.
-fn parse_version_key(s: &str) -> ((u64, u64, u64), bool) {
-    let addon = s.ends_with("-Addon");
-    let base = s.strip_suffix("-Addon").unwrap_or(s);
-    let mut parts = base.splitn(3, '.').map(|p| p.parse::<u64>().unwrap_or(0));
-    ((parts.next().unwrap_or(0), parts.next().unwrap_or(0), parts.next().unwrap_or(0)), addon)
 }
 
 /// Manages the `reshade_state.json` file under the iris data directory.
