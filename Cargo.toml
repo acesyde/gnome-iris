@@ -36,6 +36,12 @@ log = "0.4"
 i18n-embed    = { version = "0.16", features = ["desktop-requester", "fluent", "fluent-system"] }
 i18n-embed-fl = "0.10"
 
+# Pinned to commit baa1c23 because the `gnome_49` feature (GNOME 49 / GTK 4.18 widget
+# bindings) is not yet included in any stable relm4 release (latest: 0.9.x).
+# Upstream tracking issue: https://github.com/relm4/relm4/issues/756
+# Last verified working: 2026-03-16
+# To upgrade: run `cargo update -p relm4 -p relm4-components` once a stable release
+# ships `gnome_49`, then smoke-test the full UI.
 relm4 = { git = "https://github.com/relm4/relm4", rev = "baa1c23ab35e3b8c4117714042671f7ed02aeabb", default-features = false, features = ["adw", "css", "gnome_49", "macros"] }
 relm4-components = { git = "https://github.com/relm4/relm4", rev = "baa1c23ab35e3b8c4117714042671f7ed02aeabb", features = ["libadwaita"] }
 relm4-icons = "0.10"

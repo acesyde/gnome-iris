@@ -80,7 +80,7 @@ sub-enum, keeping `Preferences::Controls` focused.
 
 ---
 
-### 3. Document and track the relm4 git-pin
+### 3. ✅ Document and track the relm4 git-pin
 
 **Problem:** `Cargo.toml` pins relm4 (and `relm4-components`) to a specific Git commit
 (`baa1c23ab35e3b8c4117714042671f7ed02aeabb`). There is no comment explaining:
@@ -342,7 +342,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 
 | # | Item | Effort | Value | Do First? |
 |---|------|--------|-------|-----------|
-| 3 | Document relm4 git-pin | XS | High | Yes — zero risk, high payoff |
+| 3 | ✅ Document relm4 git-pin | XS | High | Yes — zero risk, high payoff |
 | 4 | Remove sevenz-rust | XS | Medium | Yes — one-liner |
 | 7 | i18n fallback to English | XS | Medium | Yes — one-liner |
 | 10 | Document message-flow architecture | XS | Medium | Yes — documentation only |
