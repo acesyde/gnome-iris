@@ -104,8 +104,7 @@ pub fn detect_install_status(game_dir: &Path) -> InstallStatus {
                 .unwrap_or(ExeArch::X86_64);
             // The target path is <base>/reshade/<version>/ReShade{32,64}.dll,
             // so the version is the name of the parent directory.
-            let version = target
-                .and_then(|p| p.parent()?.file_name()?.to_str().map(String::from));
+            let version = target.and_then(|p| p.parent()?.file_name()?.to_str().map(String::from));
             return InstallStatus::Installed { dll, arch, version };
         }
     }

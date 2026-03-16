@@ -84,7 +84,12 @@ pub(super) fn handle(model: &mut Window, msg: GamesMsg, root: &adw::ApplicationW
     match msg {
         GamesMsg::GameSelected(id) => handle_game_selected(model, id),
         GamesMsg::GameRemoveRequested(id) => handle_game_remove(model, id),
-        GamesMsg::Install { game_id, dll, arch, version } => handle_install(model, &game_id, dll, arch, version),
+        GamesMsg::Install {
+            game_id,
+            dll,
+            arch,
+            version,
+        } => handle_install(model, &game_id, dll, arch, version),
         GamesMsg::Uninstall { game_id, dll } => handle_uninstall(model, &game_id, dll),
         GamesMsg::Progress(event) => handle_progress(model, &event),
         GamesMsg::InstallComplete { version } => handle_install_complete(model, &version),
@@ -92,7 +97,11 @@ pub(super) fn handle(model: &mut Window, msg: GamesMsg, root: &adw::ApplicationW
         GamesMsg::WorkerError(e) => handle_worker_error(model, &e),
         GamesMsg::AddGameRequested => handle_add_game_requested(model, root),
         GamesMsg::GameAdded { name, path, arch } => handle_game_added(model, name, path, arch),
-        GamesMsg::ShaderToggled { game_id, repo_name, enabled } => handle_shader_toggled(model, &game_id, &repo_name, enabled),
+        GamesMsg::ShaderToggled {
+            game_id,
+            repo_name,
+            enabled,
+        } => handle_shader_toggled(model, &game_id, &repo_name, enabled),
         GamesMsg::GameStatusDetected { id, status } => handle_game_status_detected(model, id, status),
     }
 }
@@ -163,9 +172,17 @@ pub(super) fn handle_progress(model: &Window, event: &ProgressEvent) {
 pub(super) fn handle_install_complete(model: &mut Window, version: &str) {
     let (dll, arch) = model.pending_install.take().unwrap_or((DllOverride::Dxgi, ExeArch::X86_64));
     model.game_detail.emit(game_detail::Controls::ClearProgress);
-    model.game_detail.emit(game_detail::Controls::MarkInstalled { version: version.to_string(), dll, arch });
+    model.game_detail.emit(game_detail::Controls::MarkInstalled {
+        version: version.to_string(),
+        dll,
+        arch,
+    });
     if let Some(id) = model.current_game_id.clone() {
-        let status = InstallStatus::Installed { dll, arch, version: Some(version.to_string()) };
+        let status = InstallStatus::Installed {
+            dll,
+            arch,
+            version: Some(version.to_string()),
+        };
         if let Some(game) = model.games.iter_mut().find(|g| g.id == id) {
             game.status = status.clone();
         }

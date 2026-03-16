@@ -187,7 +187,11 @@ impl SimpleComponent for GameList {
                 self.games.retain(|g| g.id != id);
                 self.has_manual = self.games.iter().any(|g| matches!(g.source, GameSource::Manual));
             },
-            Controls::SetGameStatus { id, version, latest_version } => {
+            Controls::SetGameStatus {
+                id,
+                version,
+                latest_version,
+            } => {
                 let subtitle = match &version {
                     Some(v) if !v.is_empty() => format!("ReShade {v}"),
                     Some(_) => fl!("reshade-installed"),
@@ -197,9 +201,7 @@ impl SimpleComponent for GameList {
                     row.set_subtitle(&subtitle);
                 }
                 let outdated = match (&version, &latest_version) {
-                    (Some(installed), Some(latest)) => {
-                        crate::reshade::reshade::is_version_outdated(installed, latest)
-                    },
+                    (Some(installed), Some(latest)) => crate::reshade::reshade::is_version_outdated(installed, latest),
                     _ => false,
                 };
                 if let Some(pill) = self.auto_update_pills.get(&id).or_else(|| self.manual_update_pills.get(&id)) {
@@ -219,7 +221,9 @@ fn build_game_row(game: &Game, sender: &ComponentSender<GameList>) -> (adw::Acti
     row.set_widget_name(&game.id);
     row.set_title(&game.name);
     let subtitle = match &game.status {
-        InstallStatus::Installed { version: Some(v), .. } if !v.is_empty() => format!("ReShade {v}"),
+        InstallStatus::Installed {
+            version: Some(v), ..
+        } if !v.is_empty() => format!("ReShade {v}"),
         InstallStatus::Installed { .. } => fl!("reshade-installed"),
         InstallStatus::NotInstalled => fl!("not-installed"),
     };
