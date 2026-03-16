@@ -31,7 +31,15 @@ impl AppState {
     /// Initializes app state from disk (or defaults if first run).
     #[must_use]
     pub fn load() -> Self {
-        let data_dir = iris_data_dir();
+        Self::load_from(iris_data_dir())
+    }
+
+    /// Initializes app state from `data_dir` (or defaults if first run).
+    ///
+    /// Unlike [`Self::load`], this method accepts an explicit directory, making
+    /// it suitable for integration tests that need an isolated data directory.
+    #[must_use]
+    pub fn load_from(data_dir: PathBuf) -> Self {
         let config = load_config(&data_dir);
         let games = load_games(&data_dir);
         let reshade_version = load_reshade_version(&data_dir);

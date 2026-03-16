@@ -161,7 +161,7 @@ and deserialise at startup with `serde`. The `CatalogEntry` type stays; only the
 
 ---
 
-### 8. Add domain-layer integration tests — **Medium effort / high confidence value**
+### 8. Add domain-layer integration tests — **Medium effort / high confidence value** ✅ Done
 
 **Problem:** Unit tests cover individual functions in isolation but there are no end-to-end domain tests that
 exercise a full flow (e.g., download → extract → install → detect_status → uninstall).
@@ -203,7 +203,7 @@ The Window shows games immediately with `InstallStatus::NotInstalled` as a place
 | 6   | Slim down `Controls` enum         | M      | High   | ✅ Done   |
 | 4   | Typed `Progress` enum             | M      | Medium | ✅ Yes    |
 | 7   | Catalog as data file              | M      | Medium | ✅ Yes    |
-| 8   | Integration tests                 | M      | High   | Next      |
+| 8   | Integration tests                 | M      | High   | ✅ Done   |
 | 3   | Service traits                    | L      | High   | ✅ Done   |
 
 ---

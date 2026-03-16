@@ -20,8 +20,8 @@ pub mod icon_names {
 
 /// Localization module.
 pub mod localization;
-/// Domain logic module.
-pub mod reshade;
+/// Domain logic module — re-exported from the `gnome_iris` library crate.
+pub use gnome_iris::reshade;
 /// UI module.
 pub mod ui;
 
