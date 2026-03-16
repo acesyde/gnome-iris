@@ -377,6 +377,16 @@ impl Component for Window {
     }
 }
 
+impl Window {
+    /// Save application state and add an error toast if the save fails.
+    pub(super) fn save_or_toast(&self) {
+        if let Err(e) = self.app_state.save() {
+            log::error!("Failed to save application state: {e}");
+            self.toast_overlay.add_toast(adw::Toast::new(&format!("Failed to save: {e}")));
+        }
+    }
+}
+
 /// Determine which cached `ReShade` versions are currently in use by at least one game.
 ///
 /// A version is "in use" when a game's DLL symlink points into that version's directory.

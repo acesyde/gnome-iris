@@ -97,7 +97,7 @@ display. This decouples progress semantics from presentation.
 
 ---
 
-### 5. Surface persistence errors to the user — **Medium effort / high UX value**
+### 5. Surface persistence errors to the user — **Medium effort / high UX value** ✅ Done
 
 **Problem:** Every `AppState::save()` call swallows failures with `log::error!()` only:
 
@@ -198,7 +198,7 @@ The Window shows games immediately with `InstallStatus::NotInstalled` as a place
 | --- | --------------------------------- | ------ | ------ | --------- |
 | 1   | Deduplicate `parse_version_key()` | XS     | High   | ✅ Yes    |
 | 2   | Extract path constants            | S      | Medium | ✅ Yes    |
-| 5   | Surface save errors to user       | S      | High   | ✅ Yes    |
+| 5   | Surface save errors to user       | S      | High   | ✅ Done   |
 | 9   | Async startup detection           | S      | Medium | ✅ Done   |
 | 6   | Slim down `Controls` enum         | M      | High   | ✅ Done   |
 | 4   | Typed `Progress` enum             | M      | Medium | ✅ Yes    |

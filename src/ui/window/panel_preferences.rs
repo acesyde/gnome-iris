@@ -42,9 +42,7 @@ pub(super) fn handle(model: &mut Window, msg: PrefsMsg) {
 /// Persist an updated global config.
 pub(super) fn handle_config_changed(model: &mut Window, config: GlobalConfig) {
     model.app_state.config = config;
-    if let Err(e) = model.app_state.save() {
-        log::error!("Failed to save config: {e}");
-    }
+    model.save_or_toast();
 }
 
 /// Store the latest version, forward to Preferences, and refresh pill visibility on all installed games.

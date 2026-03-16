@@ -164,19 +164,17 @@ pub(super) fn handle_install_complete(model: &mut Window, version: &str) {
     let (dll, arch) = model.pending_install.take().unwrap_or((DllOverride::Dxgi, ExeArch::X86_64));
     model.game_detail.emit(game_detail::Controls::ClearProgress);
     model.game_detail.emit(game_detail::Controls::MarkInstalled { version: version.to_string(), dll, arch });
-    if let Some(id) = &model.current_game_id {
+    if let Some(id) = model.current_game_id.clone() {
         let status = InstallStatus::Installed { dll, arch, version: Some(version.to_string()) };
-        if let Some(game) = model.games.iter_mut().find(|g| &g.id == id) {
+        if let Some(game) = model.games.iter_mut().find(|g| g.id == id) {
             game.status = status.clone();
         }
-        if let Some(game) = model.app_state.games.iter_mut().find(|g| &g.id == id) {
+        if let Some(game) = model.app_state.games.iter_mut().find(|g| g.id == id) {
             game.status = status;
-            if let Err(e) = model.app_state.save() {
-                log::error!("Failed to save game status after install: {e}");
-            }
         }
+        model.save_or_toast();
         model.game_list.emit(game_list::Controls::SetGameStatus {
-            id: id.clone(),
+            id,
             version: Some(version.to_string()),
             latest_version: model.latest_version.clone(),
         });
@@ -187,18 +185,16 @@ pub(super) fn handle_install_complete(model: &mut Window, version: &str) {
 pub(super) fn handle_uninstall_complete(model: &mut Window) {
     model.game_detail.emit(game_detail::Controls::ClearProgress);
     model.game_detail.emit(game_detail::Controls::MarkUninstalled);
-    if let Some(id) = &model.current_game_id {
-        if let Some(game) = model.games.iter_mut().find(|g| &g.id == id) {
+    if let Some(id) = model.current_game_id.clone() {
+        if let Some(game) = model.games.iter_mut().find(|g| g.id == id) {
             game.status = InstallStatus::NotInstalled;
         }
-        if let Some(game) = model.app_state.games.iter_mut().find(|g| &g.id == id) {
+        if let Some(game) = model.app_state.games.iter_mut().find(|g| g.id == id) {
             game.status = InstallStatus::NotInstalled;
-            if let Err(e) = model.app_state.save() {
-                log::error!("Failed to save game status after uninstall: {e}");
-            }
         }
+        model.save_or_toast();
         model.game_list.emit(game_list::Controls::SetGameStatus {
-            id: id.clone(),
+            id,
             version: None,
             latest_version: model.latest_version.clone(),
         });
@@ -221,9 +217,7 @@ pub(super) fn handle_add_game_requested(model: &Window, root: &adw::ApplicationW
 pub(super) fn handle_game_remove(model: &mut Window, id: String) {
     model.games.retain(|g| g.id != id);
     model.app_state.games.retain(|g| g.id != id);
-    if let Err(e) = model.app_state.save() {
-        log::error!("Failed to save games after removal: {e}");
-    }
+    model.save_or_toast();
     model.game_list.emit(game_list::Controls::RemoveGame(id));
 }
 
@@ -242,9 +236,7 @@ pub(super) fn handle_shader_toggled(model: &mut Window, game_id: &str, repo_name
     }
     if let Some(game) = model.app_state.games.iter_mut().find(|g| g.id == game_id) {
         update(&mut game.shader_overrides);
-        if let Err(e) = model.app_state.save() {
-            log::error!("Failed to save shader overrides: {e}");
-        }
+        model.save_or_toast();
     }
 }
 
@@ -269,9 +261,7 @@ pub(super) fn handle_game_added(model: &mut Window, name: String, path: PathBuf,
     let mut game = Game::new(name, path, GameSource::Manual);
     game.preferred_arch = Some(arch);
     model.app_state.games.push(game.clone());
-    if let Err(e) = model.app_state.save() {
-        log::error!("Failed to save games: {e}");
-    }
+    model.save_or_toast();
     model.games.push(game.clone());
     model.game_list.emit(game_list::Controls::AddGame(game));
     // Prime the pill immediately if the latest version is already known.
