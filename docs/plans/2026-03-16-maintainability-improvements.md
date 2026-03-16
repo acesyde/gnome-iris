@@ -111,7 +111,7 @@ contributor has no way to know whether they can upgrade this dependency.
 
 ---
 
-### 4. Remove or justify `sevenz-rust` dependency
+### 4. ✅ Remove or justify `sevenz-rust` dependency
 
 **Problem:** `Cargo.toml` declares `sevenz-rust = "0.6"` as a runtime dependency. A search of all `.rs`
 source files finds **no `use sevenz_rust`** or `extern crate sevenz_rust` anywhere. It is either:
@@ -343,7 +343,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 | # | Item | Effort | Value | Do First? |
 |---|------|--------|-------|-----------|
 | 3 | ✅ Document relm4 git-pin | XS | High | Yes — zero risk, high payoff |
-| 4 | Remove sevenz-rust | XS | Medium | Yes — one-liner |
+| 4 | ✅ Remove sevenz-rust | XS | Medium | Yes — one-liner |
 | 7 | i18n fallback to English | XS | Medium | Yes — one-liner |
 | 10 | Document message-flow architecture | XS | Medium | Yes — documentation only |
 | 6 | Consolidate dual .ftl files | XS–S | Medium | Yes — before next translation round |
