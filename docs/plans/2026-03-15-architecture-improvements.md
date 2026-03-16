@@ -41,7 +41,7 @@ that all modules import. No path string should appear in more than one place.
 
 ---
 
-### 3. Introduce service traits for the domain layer — **Medium effort / high long-term value**
+### 3. Introduce service traits for the domain layer — **Medium effort / high long-term value** ✅ Done
 
 **Problem:** All domain operations are free functions. The UI calls them directly, which:
 
@@ -204,7 +204,7 @@ The Window shows games immediately with `InstallStatus::NotInstalled` as a place
 | 4   | Typed `Progress` enum             | M      | Medium | ✅ Yes    |
 | 7   | Catalog as data file              | M      | Medium | ✅ Yes    |
 | 8   | Integration tests                 | M      | High   | Next      |
-| 3   | Service traits                    | L      | High   | Later     |
+| 3   | Service traits                    | L      | High   | ✅ Done   |
 
 ---
 

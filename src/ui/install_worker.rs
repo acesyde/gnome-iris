@@ -1,12 +1,13 @@
 //! Async worker for downloading and installing `ReShade`.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use anyhow::Context as _;
 use relm4::{ComponentSender, Worker};
 
-use crate::reshade::cache::UpdateCache;
 use crate::reshade::game::{DllOverride, ExeArch};
+use crate::reshade::services::ReShadeProvider;
 use crate::reshade::{d3dcompiler, install, reshade};
 use crate::ui::worker_types::ProgressEvent;
 
@@ -35,8 +36,6 @@ pub enum Controls {
     },
     /// Download a specific `ReShade` version to the local cache (no game install).
     DownloadVersion {
-        /// App data directory.
-        data_dir: PathBuf,
         /// The version string to download, e.g. `"6.1.0"`.
         version: String,
         /// Whether to download the Addon Support variant.
@@ -67,17 +66,21 @@ pub enum Signal {
     Error(String),
 }
 
-/// Background install worker (no widget tree).
-pub struct InstallWorker;
+/// Background install worker generic over a [`ReShadeProvider`].
+pub struct InstallWorker<S: ReShadeProvider> {
+    service: Arc<S>,
+}
 
 #[allow(missing_docs)]
-impl Worker for InstallWorker {
-    type Init = ();
+impl<S: ReShadeProvider> Worker for InstallWorker<S> {
+    type Init = S;
     type Input = Controls;
     type Output = Signal;
 
-    fn init((): (), _sender: ComponentSender<Self>) -> Self {
-        Self
+    fn init(service: S, _sender: ComponentSender<Self>) -> Self {
+        Self {
+            service: Arc::new(service),
+        }
     }
 
     fn update(&mut self, msg: Controls, sender: ComponentSender<Self>) {
@@ -103,44 +106,24 @@ impl Worker for InstallWorker {
                     sender.output(Signal::Error(e.to_string())).ok();
                 },
             },
-            Controls::DownloadVersion {
-                data_dir,
-                version,
-                addon,
-            } => {
+            Controls::DownloadVersion { version, addon } => {
+                let service = Arc::clone(&self.service);
+                let version_key = if addon { format!("{version}-Addon") } else { version.clone() };
+                sender
+                    .output(Signal::Progress(ProgressEvent::Downloading {
+                        version: version_key.clone(),
+                    }))
+                    .ok();
                 relm4::spawn(async move {
-                    if let Err(e) = do_download_version(&data_dir, &version, addon, &sender).await {
+                    if let Err(e) = service.download_and_extract(&version, addon).await {
                         sender.output(Signal::DownloadVersionError(e.to_string())).ok();
+                    } else {
+                        sender.output(Signal::DownloadVersionComplete { version_key }).ok();
                     }
                 });
             },
         }
     }
-}
-
-async fn do_download_version(
-    data_dir: &std::path::Path,
-    version: &str,
-    addon: bool,
-    sender: &ComponentSender<InstallWorker>,
-) -> anyhow::Result<()> {
-    let dir_key = if addon { format!("{version}-Addon") } else { version.to_owned() };
-    sender.output(Signal::Progress(ProgressEvent::Downloading { version: dir_key.clone() })).ok();
-    let version_dir = reshade::version_dir(data_dir, &dir_key);
-    if !version_dir.join(ExeArch::X86_64.reshade_dll()).exists() {
-        let url = reshade::download_url(version, addon);
-        reshade::download_and_extract(&url, &version_dir).await?;
-    }
-    let cache = UpdateCache::new(data_dir.to_path_buf());
-    if let Err(e) = cache.add_installed(&dir_key) {
-        log::warn!("Could not update installed versions cache: {e}");
-    }
-    sender
-        .output(Signal::DownloadVersionComplete {
-            version_key: dir_key,
-        })
-        .ok();
-    Ok(())
 }
 
 fn do_install(
@@ -149,7 +132,7 @@ fn do_install(
     dll: DllOverride,
     arch: ExeArch,
     version: &str,
-    sender: &ComponentSender<InstallWorker>,
+    sender: &ComponentSender<InstallWorker<impl ReShadeProvider>>,
 ) -> anyhow::Result<()> {
     let version_dir = reshade::version_dir(data_dir, version);
     if !version_dir.join(arch.reshade_dll()).exists() {

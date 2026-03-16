@@ -12,5 +12,6 @@ pub mod install;
 pub mod paths;
 #[allow(clippy::module_inception)]
 pub mod reshade;
+pub mod services;
 pub mod shaders;
 pub mod steam;

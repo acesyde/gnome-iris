@@ -12,6 +12,7 @@ use crate::reshade::app_state::AppState;
 use crate::reshade::game::{Game, InstallStatus};
 use crate::reshade::install::detect_install_status;
 use crate::reshade::reshade::list_installed_versions;
+use crate::reshade::services::{DefaultReShadeProvider, DefaultShaderSyncService};
 use crate::ui::add_game_dialog;
 use crate::ui::add_shader_repo_dialog;
 use crate::ui::game_detail;
@@ -36,9 +37,9 @@ pub struct Window {
     /// Preferences page child component.
     preferences: Controller<preferences::Preferences>,
     /// Background install/uninstall worker.
-    install_worker: WorkerController<install_worker::InstallWorker>,
+    install_worker: WorkerController<install_worker::InstallWorker<DefaultReShadeProvider>>,
     /// Background shader sync worker (used for single-repo downloads).
-    shader_worker: WorkerController<shader_worker::ShaderWorker>,
+    shader_worker: WorkerController<shader_worker::ShaderWorker<DefaultShaderSyncService>>,
     /// Dialog for adding a custom shader repository.
     add_shader_repo_dialog: relm4::Controller<add_shader_repo_dialog::AddShaderRepoDialog>,
     /// Dialog for manually adding a game.
@@ -108,22 +109,38 @@ impl Component for Window {
             .launch(games.clone())
             .forward(sender.input_sender(), |sig| match sig {
                 game_list::Signal::GameSelected(id) => Controls::Games(panel_games::GamesMsg::GameSelected(id)),
-                game_list::Signal::GameRemoveRequested(id) => Controls::Games(panel_games::GamesMsg::GameRemoveRequested(id)),
+                game_list::Signal::GameRemoveRequested(id) => {
+                    Controls::Games(panel_games::GamesMsg::GameRemoveRequested(id))
+                },
             });
 
         let game_detail =
             game_detail::GameDetail::builder()
                 .launch(())
                 .forward(sender.input_sender(), |sig| match sig {
-                    game_detail::Signal::Install { game_id, dll, arch, version } => {
-                        Controls::Games(panel_games::GamesMsg::Install { game_id, dll, arch, version })
-                    },
+                    game_detail::Signal::Install {
+                        game_id,
+                        dll,
+                        arch,
+                        version,
+                    } => Controls::Games(panel_games::GamesMsg::Install {
+                        game_id,
+                        dll,
+                        arch,
+                        version,
+                    }),
                     game_detail::Signal::Uninstall { game_id, dll } => {
                         Controls::Games(panel_games::GamesMsg::Uninstall { game_id, dll })
                     },
-                    game_detail::Signal::ShaderToggled { game_id, repo_name, enabled } => {
-                        Controls::Games(panel_games::GamesMsg::ShaderToggled { game_id, repo_name, enabled })
-                    },
+                    game_detail::Signal::ShaderToggled {
+                        game_id,
+                        repo_name,
+                        enabled,
+                    } => Controls::Games(panel_games::GamesMsg::ShaderToggled {
+                        game_id,
+                        repo_name,
+                        enabled,
+                    }),
                 });
 
         let installed_versions = list_installed_versions(&app_state.data_dir).unwrap_or_else(|e| {
@@ -141,25 +158,34 @@ impl Component for Window {
         let preferences = preferences::Preferences::builder().launch(preferences_init).forward(
             sender.input_sender(),
             |sig| match sig {
-                preferences::Signal::ConfigChanged(config) => Controls::Prefs(panel_preferences::PrefsMsg::ConfigChanged(config)),
-                preferences::Signal::InstallVersionRequested(v) => Controls::Prefs(panel_preferences::PrefsMsg::VersionDownloadRequested(v)),
-                preferences::Signal::RemoveVersionRequested(v) => Controls::Prefs(panel_preferences::PrefsMsg::VersionRemoveRequested(v)),
+                preferences::Signal::ConfigChanged(config) => {
+                    Controls::Prefs(panel_preferences::PrefsMsg::ConfigChanged(config))
+                },
+                preferences::Signal::InstallVersionRequested(v) => {
+                    Controls::Prefs(panel_preferences::PrefsMsg::VersionDownloadRequested(v))
+                },
+                preferences::Signal::RemoveVersionRequested(v) => {
+                    Controls::Prefs(panel_preferences::PrefsMsg::VersionRemoveRequested(v))
+                },
             },
         );
 
-        let install_worker = install_worker::InstallWorker::builder().detach_worker(()).forward(
-            sender.input_sender(),
-            |sig| match sig {
+        let install_worker = install_worker::InstallWorker::builder()
+            .detach_worker(DefaultReShadeProvider::new(app_state.data_dir.clone()))
+            .forward(sender.input_sender(), |sig| match sig {
                 install_worker::Signal::Progress(msg) => Controls::Games(panel_games::GamesMsg::Progress(msg)),
-                install_worker::Signal::InstallComplete { version } => Controls::Games(panel_games::GamesMsg::InstallComplete { version }),
+                install_worker::Signal::InstallComplete { version } => {
+                    Controls::Games(panel_games::GamesMsg::InstallComplete { version })
+                },
                 install_worker::Signal::UninstallComplete => Controls::Games(panel_games::GamesMsg::UninstallComplete),
                 install_worker::Signal::DownloadVersionComplete { version_key } => {
                     Controls::Prefs(panel_preferences::PrefsMsg::VersionDownloadComplete(version_key))
                 },
-                install_worker::Signal::DownloadVersionError(e) => Controls::Prefs(panel_preferences::PrefsMsg::VersionDownloadError(e)),
+                install_worker::Signal::DownloadVersionError(e) => {
+                    Controls::Prefs(panel_preferences::PrefsMsg::VersionDownloadError(e))
+                },
                 install_worker::Signal::Error(e) => Controls::Games(panel_games::GamesMsg::WorkerError(e)),
-            },
-        );
+            });
 
         let known_names: std::collections::HashSet<&str> =
             crate::reshade::catalog::KNOWN_REPOS.iter().map(|e| e.local_name.as_str()).collect();
@@ -177,8 +203,12 @@ impl Component for Window {
                 custom_repos,
             })
             .forward(sender.input_sender(), |sig| match sig {
-                shader_catalog::Signal::DownloadRequested(repo) => Controls::Shaders(panel_shaders::ShadersMsg::DownloadRequested(repo)),
-                shader_catalog::Signal::AddCustomRepoRequested => Controls::Shaders(panel_shaders::ShadersMsg::AddCustomRepoRequested),
+                shader_catalog::Signal::DownloadRequested(repo) => {
+                    Controls::Shaders(panel_shaders::ShadersMsg::DownloadRequested(repo))
+                },
+                shader_catalog::Signal::AddCustomRepoRequested => {
+                    Controls::Shaders(panel_shaders::ShadersMsg::AddCustomRepoRequested)
+                },
                 shader_catalog::Signal::RemoveCustomRepoRequested(repo) => {
                     Controls::Shaders(panel_shaders::ShadersMsg::RemoveCustomRepoRequested(repo))
                 },
@@ -188,7 +218,9 @@ impl Component for Window {
             add_shader_repo_dialog::AddShaderRepoDialog::builder()
                 .launch(())
                 .forward(sender.input_sender(), |sig| match sig {
-                    add_shader_repo_dialog::Signal::RepoAdded(repo) => Controls::Shaders(panel_shaders::ShadersMsg::RepoAdded(repo)),
+                    add_shader_repo_dialog::Signal::RepoAdded(repo) => {
+                        Controls::Shaders(panel_shaders::ShadersMsg::RepoAdded(repo))
+                    },
                 });
 
         let add_game_dialog = add_game_dialog::AddGameDialog::builder()
@@ -199,15 +231,17 @@ impl Component for Window {
                 },
             });
 
-        let shader_worker =
-            shader_worker::ShaderWorker::builder()
-                .detach_worker(())
-                .forward(sender.input_sender(), |sig| match sig {
-                    shader_worker::Signal::Progress(msg) => Controls::Shaders(panel_shaders::ShadersMsg::Progress(msg)),
-                    shader_worker::Signal::Complete => Controls::Shaders(panel_shaders::ShadersMsg::SyncComplete),
-                    shader_worker::Signal::RepoError { error, .. } => Controls::Shaders(panel_shaders::ShadersMsg::SyncError(error)),
-                    shader_worker::Signal::Error(e) => Controls::Shaders(panel_shaders::ShadersMsg::SyncError(e)),
-                });
+        let shader_worker = shader_worker::ShaderWorker::builder().detach_worker(DefaultShaderSyncService).forward(
+            sender.input_sender(),
+            |sig| match sig {
+                shader_worker::Signal::Progress(msg) => Controls::Shaders(panel_shaders::ShadersMsg::Progress(msg)),
+                shader_worker::Signal::Complete => Controls::Shaders(panel_shaders::ShadersMsg::SyncComplete),
+                shader_worker::Signal::RepoError { error, .. } => {
+                    Controls::Shaders(panel_shaders::ShadersMsg::SyncError(error))
+                },
+                shader_worker::Signal::Error(e) => Controls::Shaders(panel_shaders::ShadersMsg::SyncError(e)),
+            },
+        );
 
         // Capture values needed for version-check task before app_state is moved.
         let update_interval = app_state.config.update_interval_hours;

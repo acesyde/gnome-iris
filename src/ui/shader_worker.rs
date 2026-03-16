@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use relm4::{ComponentSender, Worker};
 
 use crate::reshade::config::ShaderRepo;
-use crate::reshade::shaders;
+use crate::reshade::services::ShaderSyncService;
 use crate::ui::worker_types::ProgressEvent;
 
 /// Input commands for the shader worker.
@@ -47,17 +47,19 @@ pub enum Signal {
     Error(String),
 }
 
-/// Background shader sync worker.
-pub struct ShaderWorker;
+/// Background shader sync worker generic over a [`ShaderSyncService`].
+pub struct ShaderWorker<S: ShaderSyncService> {
+    service: S,
+}
 
 #[allow(missing_docs)]
-impl Worker for ShaderWorker {
-    type Init = ();
+impl<S: ShaderSyncService> Worker for ShaderWorker<S> {
+    type Init = S;
     type Input = Controls;
     type Output = Signal;
 
-    fn init((): (), _sender: ComponentSender<Self>) -> Self {
-        Self
+    fn init(service: S, _sender: ComponentSender<Self>) -> Self {
+        Self { service }
     }
 
     fn update(&mut self, msg: Controls, sender: ComponentSender<Self>) {
@@ -73,8 +75,12 @@ impl Worker for ShaderWorker {
                     return;
                 }
                 for repo in &repos {
-                    sender.output(Signal::Progress(ProgressEvent::SyncingRepo { name: repo.local_name.clone() })).ok();
-                    if let Err(e) = shaders::sync_repo(repo, &repos_dir) {
+                    sender
+                        .output(Signal::Progress(ProgressEvent::SyncingRepo {
+                            name: repo.local_name.clone(),
+                        }))
+                        .ok();
+                    if let Err(e) = self.service.sync_repo(repo, &repos_dir) {
                         sender
                             .output(Signal::RepoError {
                                 repo_name: repo.local_name.clone(),
@@ -83,7 +89,7 @@ impl Worker for ShaderWorker {
                             .ok();
                     }
                 }
-                if let Err(e) = shaders::rebuild_merged(&repos_dir, &disabled_repos) {
+                if let Err(e) = self.service.rebuild_merged(&repos_dir, &disabled_repos) {
                     sender.output(Signal::Error(e.to_string())).ok();
                     return;
                 }
@@ -95,8 +101,12 @@ impl Worker for ShaderWorker {
                     sender.output(Signal::Error(e.to_string())).ok();
                     return;
                 }
-                sender.output(Signal::Progress(ProgressEvent::SyncingRepo { name: repo.local_name.clone() })).ok();
-                match shaders::sync_repo(&repo, &repos_dir) {
+                sender
+                    .output(Signal::Progress(ProgressEvent::SyncingRepo {
+                        name: repo.local_name.clone(),
+                    }))
+                    .ok();
+                match self.service.sync_repo(&repo, &repos_dir) {
                     Ok(()) => sender.output(Signal::Complete).ok(),
                     Err(e) => sender
                         .output(Signal::RepoError {

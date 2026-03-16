@@ -77,11 +77,7 @@ pub(super) fn handle_version_download_requested(model: &Window, version_key: &st
     let (version, addon) = version_key
         .strip_suffix("-Addon")
         .map_or_else(|| (version_key.to_owned(), false), |base| (base.to_owned(), true));
-    model.install_worker.emit(install_worker::Controls::DownloadVersion {
-        data_dir: model.app_state.data_dir.clone(),
-        version,
-        addon,
-    });
+    model.install_worker.emit(install_worker::Controls::DownloadVersion { version, addon });
 }
 
 /// Notify Preferences that a version download completed; also sync Window's version list.
