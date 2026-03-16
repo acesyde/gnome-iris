@@ -24,7 +24,3 @@ Iris handles downloading ReShade, installing it into your game directories, and 
 - [reshade-steam-proton](https://github.com/kevinlekiller/reshade-steam-proton) by kevinlekiller — the original shell script that pioneered ReShade management under Wine/Proton on Linux, and the inspiration for this project.
 - [ReShade](https://reshade.me/) by crosire.
 - [ratic](https://gitlab.gnome.org/ratcornu/ratic) by ratcornu — GTK4/Relm4 application template this project is based on.
-
-## License
-
-GPL-2.0
