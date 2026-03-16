@@ -32,6 +32,24 @@ pub fn setup() -> Result<()> {
 }
 
 /// Macro to look up a localized string by message ID.
+#[cfg(test)]
+mod tests {
+    use i18n_embed::fluent::fluent_language_loader;
+    use i18n_embed::unic_langid::LanguageIdentifier;
+
+    /// Requesting a locale with no .ftl file must fall back to English rather
+    /// than returning an empty string or raw message ID.
+    #[test]
+    fn unknown_locale_falls_back_to_english() {
+        let zh_cn: LanguageIdentifier = "zh-CN".parse().expect("valid lang id");
+        let loader = fluent_language_loader!();
+        i18n_embed::select(&loader, &super::Localizations, &[zh_cn])
+            .expect("select failed");
+        assert_eq!(loader.get("app-title"), "Iris");
+    }
+}
+
+/// Macro to look up a localized string by message ID.
 #[macro_export]
 macro_rules! fl {
     ($message_id:literal) => {{

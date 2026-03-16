@@ -199,7 +199,7 @@ diverging silently.
 
 ---
 
-### 7. Add English fallback for missing Fluent translations
+### 7. ✅ Add English fallback for missing Fluent translations
 
 **Problem:** `localization.rs` initialises the `FluentLanguageLoader` and selects the system locale, but
 does not explicitly configure a fallback. If a translation key is missing in a non-English locale (e.g.,
@@ -344,7 +344,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 |---|------|--------|-------|-----------|
 | 3 | ✅ Document relm4 git-pin | XS | High | Yes — zero risk, high payoff |
 | 4 | ✅ Remove sevenz-rust | XS | Medium | Yes — one-liner |
-| 7 | i18n fallback to English | XS | Medium | Yes — one-liner |
+| 7 | ✅ i18n fallback to English | XS | Medium | Yes — one-liner |
 | 10 | Document message-flow architecture | XS | Medium | Yes — documentation only |
 | 6 | ✅ Consolidate dual .ftl files | XS–S | Medium | Yes — before next translation round |
 | 5 | ✅ Doc comments on Controls/Signal variants | S | Medium | Before next feature work |
