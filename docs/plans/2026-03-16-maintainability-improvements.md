@@ -169,7 +169,7 @@ that answers:
 
 ---
 
-### 6. Consolidate the dual `.ftl` translation files
+### 6. ✅ Consolidate the dual `.ftl` translation files
 
 **Problem:** Every language directory under `i18n/` contains two Fluent files:
 
@@ -346,7 +346,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 | 4 | ✅ Remove sevenz-rust | XS | Medium | Yes — one-liner |
 | 7 | i18n fallback to English | XS | Medium | Yes — one-liner |
 | 10 | Document message-flow architecture | XS | Medium | Yes — documentation only |
-| 6 | Consolidate dual .ftl files | XS–S | Medium | Yes — before next translation round |
+| 6 | ✅ Consolidate dual .ftl files | XS–S | Medium | Yes — before next translation round |
 | 5 | ✅ Doc comments on Controls/Signal variants | S | Medium | Before next feature work |
 | 1 | ✅ Service trait tests | S | High | Before merging any future service changes |
 | 9 | Add dialog input validation | S | Medium | Before next UX pass |

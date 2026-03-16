@@ -46,7 +46,7 @@ mise exec -- cargo clippy
 - **`GSETTINGS_SCHEMA_DIR`**: set to `./target/share/glib-2.0/schemas` when running in dev
 - **Rust toolchain**: managed by mise (`mise.toml` pins stable 1.94.0) — no nightly features
 - **relm4 git pin**: pinned to `baa1c23ab35e3b8c4117714042671f7ed02aeabb` — don't update without testing
-- **`.ftl` filename**: `fluent_language_loader!()` derives the filename from the crate name (`gnome-iris` → `gnome_iris.ftl`) — both `iris.ftl` and `gnome_iris.ftl` exist in `i18n/en-US/`
+- **`.ftl` filename**: `fluent_language_loader!()` derives the filename from the crate name (`gnome-iris` → `gnome_iris.ftl`) — one `gnome_iris.ftl` per language directory; legacy `iris.ftl` files have been removed
 - **`connect_clicked[sender]`**: in `view!` macro, requires `sender` (not `_sender`) in `init()` signature
 - **`adw::PreferencesDialog`**: doesn't support relm4 container extensions — build dialog tree manually in `init()` rather than via the `view!` macro
 - **Domain tests**: use `tempfile` crate for isolated filesystem operations
