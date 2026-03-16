@@ -17,9 +17,13 @@ use super::Window;
 /// Messages handled by the Games panel.
 #[derive(Debug)]
 pub enum GamesMsg {
-    /// A game was selected in the list.
+    /// A game row was activated; `String` is the stable game ID.
+    ///
+    /// Pushes the detail page onto the navigation view.
     GameSelected(String),
-    /// User requested removal of a manually added game.
+    /// User clicked the trash button on a manually added game; `String` is the game ID.
+    ///
+    /// Removes the game from persisted state and the list.
     GameRemoveRequested(String),
     /// `GameDetail` requested installation.
     Install {
@@ -48,7 +52,9 @@ pub enum GamesMsg {
     },
     /// `InstallWorker` finished uninstallation.
     UninstallComplete,
-    /// `InstallWorker` reported an error.
+    /// `InstallWorker` reported a fatal error; `String` is a human-readable message.
+    ///
+    /// Logged and shown as a progress message in the detail pane.
     WorkerError(String),
     /// User clicked the Add Game button.
     AddGameRequested,

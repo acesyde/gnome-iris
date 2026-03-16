@@ -13,17 +13,34 @@ use super::Window;
 /// Messages handled by the Preferences panel.
 #[derive(Debug)]
 pub enum PrefsMsg {
-    /// Preferences emitted a config change; carry updated config.
+    /// [`Preferences`] emitted a config change; `config` is the full updated config.
+    ///
+    /// Handler persists `config` to disk via [`AppState::save`].
     ConfigChanged(GlobalConfig),
-    /// Latest `ReShade` version was fetched from GitHub; forward to Preferences.
+    /// The latest `ReShade` version (e.g. `"6.3.0"`) was fetched from GitHub (or read
+    /// from the on-disk cache).
+    ///
+    /// Forwarded to [`Preferences`] and used to refresh the "update available" pill on
+    /// all installed games in [`GameList`].
     LatestVersionFetched(String),
-    /// Preferences requested downloading a version to the local cache.
+    /// [`Preferences`] requested that `version_key` be downloaded to the local cache.
+    ///
+    /// `version_key` is a full version key, e.g. `"v6.1.0"` or `"v6.1.0-Addon"`.
+    /// Handler strips the `-Addon` suffix and forwards to the install worker.
     VersionDownloadRequested(String),
-    /// Install worker completed a version-only download.
+    /// Install worker completed a version-only download of `version_key`.
+    ///
+    /// `version_key` is the full version key that was downloaded.
+    /// Handler adds it to [`Window::installed_versions`] and notifies [`Preferences`].
     VersionDownloadComplete(String),
-    /// Install worker failed a version-only download.
+    /// Install worker failed a version-only download; `msg` is the error message.
+    ///
+    /// Shows an error toast and forwards the error to [`Preferences`] to reset spinners.
     VersionDownloadError(String),
-    /// Preferences requested removing a cached version.
+    /// [`Preferences`] requested that `version_key` be deleted from disk.
+    ///
+    /// `version_key` is the version to remove, e.g. `"v6.1.0"`.
+    /// Handler deletes the directory, updates the update cache, and notifies [`Preferences`].
     VersionRemoveRequested(String),
 }
 

@@ -14,19 +14,30 @@ use super::Window;
 /// Messages handled by the Shaders panel.
 #[derive(Debug)]
 pub enum ShadersMsg {
-    /// User requested downloading a shader repo from the catalog.
+    /// User clicked the download button for a catalog or custom repo.
+    ///
+    /// Handler forwards to the shader worker as a single-repo sync job.
     DownloadRequested(ShaderRepo),
-    /// Shader worker reported download progress.
+    /// Shader worker reported a progress event for the in-flight sync.
     Progress(ProgressEvent),
-    /// Shader worker finished syncing a catalog repo.
+    /// Shader worker finished syncing the in-flight repo.
+    ///
+    /// Forwarded to the catalog so it can stop the spinner and mark the repo installed.
     SyncComplete,
-    /// Shader worker reported an error syncing a catalog repo.
+    /// Shader worker failed to sync the in-flight repo; `String` is the error message.
+    ///
+    /// Forwarded to the catalog so it can stop the spinner.
     SyncError(String),
-    /// Shader catalog "+" button clicked — present add-repo dialog.
+    /// Shader catalog "+" button clicked — present the add-repo dialog.
     AddCustomRepoRequested,
-    /// User confirmed new custom repo in dialog.
+    /// User confirmed a new custom repo in the add-repo dialog.
+    ///
+    /// Handler validates uniqueness (rejects duplicates and known-catalog entries),
+    /// persists to config, and notifies the catalog to add a row.
     RepoAdded(ShaderRepo),
     /// User clicked the trash button on a custom repo row.
+    ///
+    /// Handler removes the repo from config and deletes the cloned directory from disk.
     RemoveCustomRepoRequested(ShaderRepo),
 }
 

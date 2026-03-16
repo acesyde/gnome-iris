@@ -11,7 +11,7 @@ pub struct AboutDialog;
 /// Input messages for [`AboutDialog`].
 #[derive(Debug)]
 pub enum Controls {
-    /// Show the dialog attached to the given window.
+    /// Present the about dialog.
     Show,
 }
 

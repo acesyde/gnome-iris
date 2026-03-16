@@ -67,36 +67,73 @@ pub struct Preferences {
 /// Input messages for [`Preferences`].
 #[derive(Debug)]
 pub enum Controls {
-    /// Update the displayed configuration.
+    /// Replace the displayed configuration with `config`.
+    ///
+    /// Purely a model update — does **not** emit [`Signal::ConfigChanged`];
+    /// use this for programmatic refreshes, not user-initiated changes.
     SetConfig(GlobalConfig),
-    /// User toggled the merge-shaders switch.
+    /// User toggled the merge-shaders switch; `bool` is the new enabled state.
+    ///
+    /// Emits [`Signal::ConfigChanged`] only when the value actually changes.
     MergeShadersChanged(bool),
-    /// User changed the update-interval spin row.
+    /// User changed the update-interval spin row; `f64` is the new interval in **hours**.
+    ///
+    /// Emits [`Signal::ConfigChanged`] only when the value actually changes.
     UpdateIntervalChanged(f64),
-    /// The latest available version was fetched from GitHub.
+    /// The latest available `ReShade` version (e.g. `"6.3.0"`) was fetched.
+    ///
+    /// Adds an "install latest" row for each variant (standard + Addon Support)
+    /// that is not already in the local cache.
     SetLatestVersion(String),
-    /// User clicked the install button for the latest uninstalled version.
+    /// Caller requests that `version_key` be downloaded to the local cache.
+    ///
+    /// `version_key` is a full version key, e.g. `"v6.1.0"` or `"v6.1.0-Addon"`.
+    /// Shows a spinner and emits [`Signal::InstallVersionRequested`]; ignored if
+    /// that key is already in flight.
     InstallLatestVersion(String),
-    /// User clicked the "+" button to open the manual version install dialog.
+    /// Open the manual version install dialog.
     OpenInstallVersionDialog,
-    /// User clicked the remove button for an installed version.
+    /// Caller requests that `version_key` be removed from the local cache.
+    ///
+    /// `version_key` is a full version key, e.g. `"v6.1.0"` or `"v6.1.0-Addon"`.
+    /// Shows a spinner and emits [`Signal::RemoveVersionRequested`]; ignored if
+    /// that key is already in flight.
     RemoveVersion(String),
-    /// Worker completed the version download.
+    /// The version download initiated by [`Controls::InstallLatestVersion`] completed.
+    ///
+    /// `version_key` is the full version key that finished downloading,
+    /// e.g. `"v6.1.0"` or `"v6.1.0-Addon"`.
+    /// Adds an installed row and removes the corresponding "not installed" row.
     VersionDownloadComplete(String),
-    /// Inline removal (in window) completed successfully.
+    /// The version removal initiated by [`Controls::RemoveVersion`] completed.
+    ///
+    /// `version_key` is the version that was removed, e.g. `"v6.1.0"`.
+    /// Removes the installed row and restores the "latest not installed" row if needed.
     VersionRemoveComplete(String),
-    /// A version operation (install or remove) failed.
+    /// A version install or remove operation failed; `msg` is a human-readable error.
+    ///
+    /// Resets all in-flight operation spinners.
     VersionOpError(String),
 }
 
 /// Output signals from [`Preferences`].
 #[derive(Debug)]
 pub enum Signal {
-    /// User changed and saved the configuration.
+    /// The user changed a setting; `config` is the full updated configuration.
+    ///
+    /// The window handler should persist this to disk.
     ConfigChanged(GlobalConfig),
-    /// Forward install request up to window.
+    /// The user requested that a version be downloaded to the local cache.
+    ///
+    /// `version_key` is a full version key, e.g. `"v6.1.0"` or `"v6.1.0-Addon"`.
+    /// The window handler should forward this to the install worker, then respond
+    /// with [`Controls::VersionDownloadComplete`] or [`Controls::VersionOpError`].
     InstallVersionRequested(String),
-    /// Forward remove request up to window.
+    /// The user requested that a cached version be deleted from disk.
+    ///
+    /// `version_key` is the version to remove, e.g. `"v6.1.0"`.
+    /// The window handler should delete the directory, then respond with
+    /// [`Controls::VersionRemoveComplete`] or [`Controls::VersionOpError`].
     RemoveVersionRequested(String),
 }
 

@@ -134,7 +134,7 @@ An unused dependency increases compile time, binary size, and the attack surface
 
 ---
 
-### 5. Add doc comments to all public UI Controls and Signal variants
+### 5. ✅ Add doc comments to all public UI Controls and Signal variants
 
 **Problem:** `CLAUDE.md` and `Cargo.toml` both deny `missing_docs` at the crate level. The domain layer
 follows this well. However several UI `Controls` and `Signal` enum variants have either no doc comment or
@@ -347,7 +347,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 | 7 | i18n fallback to English | XS | Medium | Yes — one-liner |
 | 10 | Document message-flow architecture | XS | Medium | Yes — documentation only |
 | 6 | Consolidate dual .ftl files | XS–S | Medium | Yes — before next translation round |
-| 5 | Doc comments on Controls/Signal variants | S | Medium | Before next feature work |
+| 5 | ✅ Doc comments on Controls/Signal variants | S | Medium | Before next feature work |
 | 1 | ✅ Service trait tests | S | High | Before merging any future service changes |
 | 9 | Add dialog input validation | S | Medium | Before next UX pass |
 | 8 | Fix hardcoded DLL/arch in install signal | S | Medium | Before 32-bit game support |
