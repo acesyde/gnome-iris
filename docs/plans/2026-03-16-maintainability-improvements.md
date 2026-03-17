@@ -261,7 +261,7 @@ This makes the install flow end-to-end type-safe with no implicit assumptions.
 
 ---
 
-### 9. Add pre-flight validation to the Add Game and Add Shader Repo dialogs
+### 9. ✅ Add pre-flight validation to the Add Game and Add Shader Repo dialogs
 
 **Problem:** Both dialogs do minimal validation before accepting user input:
 
@@ -349,7 +349,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 | 6 | ✅ Consolidate dual .ftl files | XS–S | Medium | Yes — before next translation round |
 | 5 | ✅ Doc comments on Controls/Signal variants | S | Medium | Before next feature work |
 | 1 | ✅ Service trait tests | S | High | Before merging any future service changes |
-| 9 | Add dialog input validation | S | Medium | Before next UX pass |
+| 9 | ✅ Add dialog input validation | S | Medium | Before next UX pass |
 | 8 | ✅ Fix hardcoded DLL/arch in install signal | S | Medium | Before 32-bit game support |
 | 2 | Split preferences.rs | M | High | When preferences.rs is next touched |
 

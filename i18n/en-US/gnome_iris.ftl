@@ -88,6 +88,8 @@ dialog-add = Add
 error-title = Error
 error-install = Failed to install ReShade
 error-shader-update = Failed to update shader repository
+error-not-an-exe = Selected file is not a Windows executable (.exe).
+error-repo-duplicate = This repository has already been added.
 
 # Status messages
 downloading-reshade = Downloading ReShade...

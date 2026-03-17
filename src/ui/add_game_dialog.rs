@@ -16,6 +16,8 @@ pub struct AddGameDialog {
     existing_paths: Vec<PathBuf>,
     /// Whether the currently selected path is already in the library.
     duplicate: bool,
+    /// Whether the selected file lacks a `.exe` extension.
+    not_exe: bool,
     /// Widget refs for programmatic control.
     name_entry: adw::EntryRow,
     path_row: adw::ActionRow,
@@ -148,6 +150,15 @@ impl SimpleComponent for AddGameDialog {
                         },
                     },
 
+                    gtk::Label {
+                        set_label: &crate::fl!("error-not-an-exe"),
+                        add_css_class: "error",
+                        set_xalign: 0.0,
+                        set_wrap: true,
+                        #[watch]
+                        set_visible: model.not_exe,
+                    },
+
                     #[name(arch_group)]
                     adw::PreferencesGroup {
                         set_title: "Architecture",
@@ -164,6 +175,7 @@ impl SimpleComponent for AddGameDialog {
             arch: ExeArch::X86_64,
             existing_paths,
             duplicate: false,
+            not_exe: false,
             name_entry: adw::EntryRow::new(),
             path_row: adw::ActionRow::new(),
             dialog: adw::Dialog::new(),
@@ -230,6 +242,7 @@ impl SimpleComponent for AddGameDialog {
                 self.path = None;
                 self.arch = ExeArch::X86_64;
                 self.duplicate = false;
+                self.not_exe = false;
                 self.name_entry.set_text("");
                 self.path_row.set_subtitle("");
                 self.path_row.remove_css_class("error");
@@ -243,6 +256,15 @@ impl SimpleComponent for AddGameDialog {
                 self.refresh_duplicate();
             },
             Controls::FileSelected(path) => {
+                if path.is_file() && !has_exe_extension(&path) {
+                    self.not_exe = true;
+                    self.path = None;
+                    self.path_row.set_subtitle(&path.to_string_lossy());
+                    self.path_row.add_css_class("error");
+                    return;
+                }
+                self.not_exe = false;
+
                 let dir = if path.is_file() {
                     // Detect arch from PE header; default to x64 on failure.
                     let detected = crate::reshade::steam::detect_exe_arch(&path).unwrap_or(ExeArch::X86_64);
@@ -289,6 +311,7 @@ impl SimpleComponent for AddGameDialog {
                 self.path = None;
                 self.arch = ExeArch::X86_64;
                 self.duplicate = false;
+                self.not_exe = false;
                 self.name_entry.set_text("");
                 self.path_row.set_subtitle("");
                 self.path_row.remove_css_class("error");
@@ -303,5 +326,37 @@ impl AddGameDialog {
     /// Recomputes `self.duplicate` from `self.path` and `self.existing_paths`.
     fn refresh_duplicate(&mut self) {
         self.duplicate = self.path.as_ref().is_some_and(|p| self.existing_paths.contains(p));
+    }
+}
+
+/// Returns `true` if `path` has a `.exe` extension (case-insensitive).
+fn has_exe_extension(path: &std::path::Path) -> bool {
+    path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("exe"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn has_exe_extension_accepts_lowercase_exe() {
+        assert!(has_exe_extension(Path::new("/games/game.exe")));
+    }
+
+    #[test]
+    fn has_exe_extension_accepts_uppercase_exe() {
+        assert!(has_exe_extension(Path::new("/games/GAME.EXE")));
+    }
+
+    #[test]
+    fn has_exe_extension_rejects_other_extensions() {
+        assert!(!has_exe_extension(Path::new("/games/game.bin")));
+        assert!(!has_exe_extension(Path::new("/games/game.dll")));
+    }
+
+    #[test]
+    fn has_exe_extension_rejects_no_extension() {
+        assert!(!has_exe_extension(Path::new("/games/game")));
     }
 }

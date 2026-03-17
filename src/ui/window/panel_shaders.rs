@@ -7,7 +7,7 @@ use relm4::adw::prelude::*;
 use crate::fl;
 use crate::reshade::config::ShaderRepo;
 use crate::ui::worker_types::ProgressEvent;
-use crate::ui::{shader_catalog, shader_worker};
+use crate::ui::{add_shader_repo_dialog, shader_catalog, shader_worker};
 
 use super::Window;
 
@@ -75,8 +75,10 @@ pub(super) fn handle_sync_error(model: &Window, e: String) {
     model.shader_catalog.emit(shader_catalog::Controls::SyncError(e));
 }
 
-/// Present the Add Custom Repo dialog.
+/// Present the Add Custom Repo dialog, pre-loading existing URLs for duplicate detection.
 pub(super) fn handle_add_custom_repo_requested(model: &Window, root: &adw::ApplicationWindow) {
+    let existing_urls = model.app_state.config.shader_repos.iter().map(|r| r.url.clone()).collect();
+    model.add_shader_repo_dialog.emit(add_shader_repo_dialog::Controls::UpdateExistingUrls(existing_urls));
     model.add_shader_repo_dialog.widget().present(Some(root));
 }
 

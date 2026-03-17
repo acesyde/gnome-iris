@@ -11,6 +11,10 @@ pub struct AddShaderRepoDialog {
     name: String,
     url: String,
     git_ref: String,
+    /// URLs already in the config — used for duplicate detection.
+    existing_urls: Vec<String>,
+    /// Whether the current URL is already in the config.
+    duplicate: bool,
     /// Widget refs stored for programmatic reset on confirm.
     name_entry: adw::EntryRow,
     url_entry: adw::EntryRow,
@@ -29,6 +33,10 @@ pub enum Controls {
     SetUrl(String),
     /// Branch/tag field changed.
     SetRef(String),
+    /// Refresh the list of already-configured repo URLs for duplicate detection.
+    ///
+    /// Emit this before presenting the dialog so the duplicate check reflects current config.
+    UpdateExistingUrls(Vec<String>),
     /// User clicked the confirm button.
     Confirm,
 }
@@ -38,6 +46,40 @@ pub enum Controls {
 pub enum Signal {
     /// User confirmed — contains the constructed repo.
     RepoAdded(ShaderRepo),
+}
+
+/// Returns `true` if `url` (trimmed) already exists in `existing` (each also trimmed).
+fn is_duplicate_url(url: &str, existing: &[String]) -> bool {
+    let trimmed = url.trim();
+    existing.iter().any(|u| u.trim() == trimmed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_duplicate_url_returns_true_for_matching_url() {
+        let existing = vec!["https://github.com/crosire/reshade-shaders".to_owned()];
+        assert!(is_duplicate_url("https://github.com/crosire/reshade-shaders", &existing));
+    }
+
+    #[test]
+    fn is_duplicate_url_returns_false_for_different_url() {
+        let existing = vec!["https://github.com/crosire/reshade-shaders".to_owned()];
+        assert!(!is_duplicate_url("https://github.com/someone/other-shaders", &existing));
+    }
+
+    #[test]
+    fn is_duplicate_url_trims_whitespace_before_comparing() {
+        let existing = vec!["https://github.com/crosire/reshade-shaders".to_owned()];
+        assert!(is_duplicate_url("  https://github.com/crosire/reshade-shaders  ", &existing));
+    }
+
+    #[test]
+    fn is_duplicate_url_returns_false_for_empty_list() {
+        assert!(!is_duplicate_url("https://github.com/crosire/reshade-shaders", &[]));
+    }
 }
 
 #[allow(missing_docs)]
@@ -80,12 +122,21 @@ impl SimpleComponent for AddShaderRepoDialog {
                         },
                     },
 
+                    gtk::Label {
+                        set_label: &fl!("error-repo-duplicate"),
+                        add_css_class: "error",
+                        set_xalign: 0.0,
+                        set_wrap: true,
+                        #[watch]
+                        set_visible: model.duplicate,
+                    },
+
                     #[name(confirm_btn)]
                     gtk::Button {
                         set_label: &fl!("dialog-add"),
                         add_css_class: "suggested-action",
                         #[watch]
-                        set_sensitive: !model.name.is_empty() && !model.url.is_empty(),
+                        set_sensitive: !model.name.is_empty() && !model.url.is_empty() && !model.duplicate,
                     },
                 },
             },
@@ -97,6 +148,8 @@ impl SimpleComponent for AddShaderRepoDialog {
             name: String::new(),
             url: String::new(),
             git_ref: String::new(),
+            existing_urls: Vec::new(),
+            duplicate: false,
             name_entry: adw::EntryRow::new(),
             url_entry: adw::EntryRow::new(),
             ref_entry: adw::EntryRow::new(),
@@ -132,12 +185,19 @@ impl SimpleComponent for AddShaderRepoDialog {
         match msg {
             Controls::Open => {},
             Controls::SetName(v) => self.name = v,
-            Controls::SetUrl(v) => self.url = v,
+            Controls::SetUrl(v) => {
+                self.url = v;
+                self.refresh_duplicate();
+            },
             Controls::SetRef(v) => self.git_ref = v,
+            Controls::UpdateExistingUrls(urls) => {
+                self.existing_urls = urls;
+                self.refresh_duplicate();
+            },
             Controls::Confirm => {
                 let name = self.name.trim().to_owned();
                 let url = self.url.trim().to_owned();
-                if name.is_empty() || url.is_empty() {
+                if name.is_empty() || url.is_empty() || self.duplicate {
                     return;
                 }
                 let branch = {
@@ -155,11 +215,19 @@ impl SimpleComponent for AddShaderRepoDialog {
                 self.name = String::new();
                 self.url = String::new();
                 self.git_ref = String::new();
+                self.duplicate = false;
                 self.name_entry.set_text("");
                 self.url_entry.set_text("");
                 self.ref_entry.set_text("");
                 self.dialog.close();
             },
         }
+    }
+}
+
+impl AddShaderRepoDialog {
+    /// Recomputes `self.duplicate` from `self.url` and `self.existing_urls`.
+    fn refresh_duplicate(&mut self) {
+        self.duplicate = is_duplicate_url(&self.url, &self.existing_urls);
     }
 }
