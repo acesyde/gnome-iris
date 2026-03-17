@@ -1,4 +1,35 @@
 //! Root application window — wires all UI components together.
+//!
+//! ## Component hierarchy
+//!
+//! ```text
+//! Window
+//! ├── GameList              → Controls::Games  (via panel_games)
+//! │     └── GameDetail     → Controls::Games  (via panel_games)
+//! ├── ShaderCatalog         → Controls::Shaders (via panel_shaders)
+//! │     └── AddShaderRepoDialog → Controls::Shaders
+//! ├── Preferences           → Controls::Prefs  (via panel_preferences)
+//! │     ├── panel_versions (inline)
+//! │     └── panel_repos    (inline)
+//! ├── AddGameDialog         → Controls::Games
+//! ├── InstallWorker         → Controls::Games | Controls::Prefs
+//! └── ShaderWorker          → Controls::Shaders
+//! ```
+//!
+//! ## Signal flow
+//!
+//! Every child component emits a typed `Signal`.  `init()` attaches a `.forward()`
+//! closure that maps each `Signal` variant to one of the three `Controls` variants
+//! (`Games`, `Shaders`, `Prefs`).  `update()` then dispatches to the matching
+//! `panel_*.rs` handler which may call back into children via `child.emit(Controls::*)`.
+//!
+//! ```text
+//! Child::Signal
+//!   → .forward() closure in init()
+//!   → Window::Controls (Games | Shaders | Prefs)
+//!   → update() → panel_{games,shaders,preferences}::handle()
+//!   → child_component.emit(ChildControls::*)
+//! ```
 
 mod panel_games;
 mod panel_preferences;
@@ -102,7 +133,7 @@ impl Component for Window {
             }
         }
 
-        // Launch child components.
+        // --- Component initialization (each component + its signal forwarding) ---
         let game_list = game_list::GameList::builder()
             .launch(games.clone())
             .forward(sender.input_sender(), |sig| match sig {
@@ -241,6 +272,7 @@ impl Component for Window {
             },
         );
 
+        // --- Widget assembly ---
         // Capture values needed for version-check task before app_state is moved.
         let update_interval = app_state.config.update_interval_hours;
         let cache_data_dir = app_state.data_dir.clone();
@@ -349,6 +381,7 @@ impl Component for Window {
         // Wire nav_view as the toast overlay's child (must be done after view_output!).
         widgets.toast_overlay.set_child(Some(nav_view));
 
+        // --- Startup async task ---
         // Spawn startup version check respecting the configured interval.
         {
             use crate::reshade::cache::UpdateCache;

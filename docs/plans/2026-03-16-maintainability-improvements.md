@@ -299,7 +299,7 @@ doing nothing or allowing invalid state.
 
 ---
 
-### 10. Extract and document the message-flow architecture
+### 10. ✅ Extract and document the message-flow architecture
 
 **Problem:** `src/ui/window/mod.rs::init()` wires together all components, workers, and signal forwarders
 in ~350 lines with no high-level comment explaining the component hierarchy or data flow. A new contributor
@@ -345,7 +345,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 | 3 | ✅ Document relm4 git-pin | XS | High | Yes — zero risk, high payoff |
 | 4 | ✅ Remove sevenz-rust | XS | Medium | Yes — one-liner |
 | 7 | ✅ i18n fallback to English | XS | Medium | Yes — one-liner |
-| 10 | Document message-flow architecture | XS | Medium | Yes — documentation only |
+| 10 | ✅ Document message-flow architecture | XS | Medium | Yes — documentation only |
 | 6 | ✅ Consolidate dual .ftl files | XS–S | Medium | Yes — before next translation round |
 | 5 | ✅ Doc comments on Controls/Signal variants | S | Medium | Before next feature work |
 | 1 | ✅ Service trait tests | S | High | Before merging any future service changes |
