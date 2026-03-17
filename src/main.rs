@@ -32,7 +32,7 @@ fn initialize_custom_resources() {
     gio::resources_register_include!("icons.gresources").unwrap();
     let display = gdk::Display::default().unwrap();
     let theme = gtk::IconTheme::for_display(&display);
-    theme.add_resource_path("/org/gnome/Iris");
+    theme.add_resource_path("/org/gnome/Iris/icons");
 }
 
 fn main() -> Result<()> {

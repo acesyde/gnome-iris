@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/org/gnome/Iris/icons/scalable/apps/">
+  <gresource prefix="/org/gnome/Iris/icons">
     <file preprocess="xml-stripblanks">hicolor/scalable/apps/iris.svg</file>
   </gresource>
 </gresources>
