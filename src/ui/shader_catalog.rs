@@ -138,7 +138,7 @@ impl SimpleComponent for ShaderCatalog {
         for entry in KNOWN_REPOS.iter() {
             let row = adw::ActionRow::new();
             row.set_title(&entry.name);
-            row.set_subtitle(&entry.description);
+            row.set_subtitle(&entry.description.replace('&', "&amp;"));
 
             let (icon, tip) = if model.installed.contains(entry.local_name.as_str()) {
                 ("view-refresh-symbolic", fl!("redownload"))
