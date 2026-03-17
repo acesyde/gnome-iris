@@ -52,6 +52,10 @@ pub enum Signal {
     InstallComplete {
         /// The installed `ReShade` version string.
         version: String,
+        /// DLL override that was installed.
+        dll: DllOverride,
+        /// Executable architecture that was targeted.
+        arch: ExeArch,
     },
     /// Uninstall finished successfully.
     UninstallComplete,
@@ -126,6 +130,29 @@ impl<S: ReShadeProvider> Worker for InstallWorker<S> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::reshade::game::{DllOverride, ExeArch};
+
+    #[test]
+    fn install_complete_signal_carries_dll_and_arch() {
+        let sig = Signal::InstallComplete {
+            version: "6.3.0".to_owned(),
+            dll: DllOverride::Dxgi,
+            arch: ExeArch::X86_64,
+        };
+        assert!(matches!(
+            sig,
+            Signal::InstallComplete {
+                dll: DllOverride::Dxgi,
+                arch: ExeArch::X86_64,
+                ..
+            }
+        ));
+    }
+}
+
 fn do_install(
     data_dir: &std::path::Path,
     game_dir: &std::path::Path,
@@ -153,6 +180,8 @@ fn do_install(
     sender
         .output(Signal::InstallComplete {
             version: version.to_owned(),
+            dll,
+            arch,
         })
         .ok();
     Ok(())

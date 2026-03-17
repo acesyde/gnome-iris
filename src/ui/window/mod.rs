@@ -48,8 +48,6 @@ pub struct Window {
     nav_view: adw::NavigationView,
     /// Toast overlay — used to surface brief error/info messages.
     toast_overlay: adw::ToastOverlay,
-    /// DLL + arch of the in-flight install (fixes hardcoded values in `handle_install_complete`).
-    pending_install: Option<(crate::reshade::game::DllOverride, crate::reshade::game::ExeArch)>,
     /// ID of the game currently shown in the detail pane (for config refresh).
     current_game_id: Option<String>,
     /// Locally-cached `ReShade` version keys; kept in sync with Preferences add/remove.
@@ -174,8 +172,8 @@ impl Component for Window {
             .detach_worker(DefaultReShadeProvider::new(app_state.data_dir.clone()))
             .forward(sender.input_sender(), |sig| match sig {
                 install_worker::Signal::Progress(msg) => Controls::Games(panel_games::GamesMsg::Progress(msg)),
-                install_worker::Signal::InstallComplete { version } => {
-                    Controls::Games(panel_games::GamesMsg::InstallComplete { version })
+                install_worker::Signal::InstallComplete { version, dll, arch } => {
+                    Controls::Games(panel_games::GamesMsg::InstallComplete { version, dll, arch })
                 },
                 install_worker::Signal::UninstallComplete => Controls::Games(panel_games::GamesMsg::UninstallComplete),
                 install_worker::Signal::DownloadVersionComplete { version_key } => {
@@ -340,7 +338,6 @@ impl Component for Window {
             add_game_dialog,
             nav_view: nav_view.clone(),
             toast_overlay: toast_overlay.clone(),
-            pending_install: None,
             current_game_id: None,
             installed_versions,
             latest_version: None,

@@ -49,6 +49,10 @@ pub enum GamesMsg {
     InstallComplete {
         /// Version key that was installed.
         version: String,
+        /// DLL override that was installed.
+        dll: DllOverride,
+        /// Executable architecture that was targeted.
+        arch: ExeArch,
     },
     /// `InstallWorker` finished uninstallation.
     UninstallComplete,
@@ -98,7 +102,7 @@ pub(super) fn handle(model: &mut Window, msg: GamesMsg, root: &adw::ApplicationW
         } => handle_install(model, &game_id, dll, arch, version),
         GamesMsg::Uninstall { game_id, dll } => handle_uninstall(model, &game_id, dll),
         GamesMsg::Progress(event) => handle_progress(model, &event),
-        GamesMsg::InstallComplete { version } => handle_install_complete(model, &version),
+        GamesMsg::InstallComplete { version, dll, arch } => handle_install_complete(model, &version, dll, arch),
         GamesMsg::UninstallComplete => handle_uninstall_complete(model),
         GamesMsg::WorkerError(e) => handle_worker_error(model, &e),
         GamesMsg::AddGameRequested => handle_add_game_requested(model, root),
@@ -145,7 +149,7 @@ pub(super) fn handle_game_selected(model: &mut Window, id: String) {
 }
 
 /// Dispatch an install job to the worker using the pre-cached version.
-pub(super) fn handle_install(model: &mut Window, game_id: &str, dll: DllOverride, arch: ExeArch, version: String) {
+pub(super) fn handle_install(model: &Window, game_id: &str, dll: DllOverride, arch: ExeArch, version: String) {
     if let Some(game) = model.games.iter().find(|g| g.id == game_id) {
         let data_dir = iris_data_dir();
         model.install_worker.emit(install_worker::Controls::Install {
@@ -155,7 +159,6 @@ pub(super) fn handle_install(model: &mut Window, game_id: &str, dll: DllOverride
             arch,
             version,
         });
-        model.pending_install = Some((dll, arch));
     }
 }
 
@@ -175,8 +178,7 @@ pub(super) fn handle_progress(model: &Window, event: &ProgressEvent) {
 }
 
 /// Clear progress and mark the game as installed.
-pub(super) fn handle_install_complete(model: &mut Window, version: &str) {
-    let (dll, arch) = model.pending_install.take().unwrap_or((DllOverride::Dxgi, ExeArch::X86_64));
+pub(super) fn handle_install_complete(model: &mut Window, version: &str, dll: DllOverride, arch: ExeArch) {
     model.game_detail.emit(game_detail::Controls::ClearProgress);
     model.game_detail.emit(game_detail::Controls::MarkInstalled {
         version: version.to_string(),

@@ -229,7 +229,7 @@ is the English string, not empty.
 
 ---
 
-### 8. Replace hardcoded DLL/arch values in the install completion signal
+### 8. ✅ Replace hardcoded DLL/arch values in the install completion signal
 
 **Problem:** `src/ui/window/panel_games.rs` handles `InstallWorker::Signal::Done` with a hardcoded
 placeholder for DLL override and architecture:
@@ -350,7 +350,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 | 5 | ✅ Doc comments on Controls/Signal variants | S | Medium | Before next feature work |
 | 1 | ✅ Service trait tests | S | High | Before merging any future service changes |
 | 9 | Add dialog input validation | S | Medium | Before next UX pass |
-| 8 | Fix hardcoded DLL/arch in install signal | S | Medium | Before 32-bit game support |
+| 8 | ✅ Fix hardcoded DLL/arch in install signal | S | Medium | Before 32-bit game support |
 | 2 | Split preferences.rs | M | High | When preferences.rs is next touched |
 
 ---
