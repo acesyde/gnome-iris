@@ -46,7 +46,7 @@ trait on a test double rather than reaching the real network.
 
 ---
 
-### 2. Split `preferences.rs` into focused sub-components
+### 2. ✅ Split `preferences.rs` into focused sub-components
 
 **Problem:** `src/ui/preferences.rs` is 640 lines and handles three unrelated concerns inside one relm4
 component:
@@ -351,7 +351,7 @@ routes it to a panel, which may emit further signals — is non-obvious until yo
 | 1 | ✅ Service trait tests | S | High | Before merging any future service changes |
 | 9 | ✅ Add dialog input validation | S | Medium | Before next UX pass |
 | 8 | ✅ Fix hardcoded DLL/arch in install signal | S | Medium | Before 32-bit game support |
-| 2 | Split preferences.rs | M | High | When preferences.rs is next touched |
+| 2 | ✅ Split preferences.rs | M | High | When preferences.rs is next touched |
 
 ---
 
