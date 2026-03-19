@@ -54,10 +54,7 @@ fn full_roundtrip_preserves_games_and_config() {
     assert_eq!(reloaded.games.len(), 2, "both games should reload");
     assert_eq!(reloaded.games[0].name, "Half-Life 2");
     assert_eq!(reloaded.games[1].name, "Portal");
-    assert!(
-        matches!(reloaded.games[1].source, GameSource::Steam { app_id: 400 }),
-        "Steam source should be preserved"
-    );
+    assert!(matches!(reloaded.games[1].source, GameSource::Steam { app_id: 400 }), "Steam source should be preserved");
 
     // Config is preserved.
     assert_eq!(reloaded.config.update_interval_hours, 12);

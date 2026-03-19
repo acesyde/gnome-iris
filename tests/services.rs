@@ -8,8 +8,8 @@ use gnome_iris::reshade::cache::UpdateCache;
 use gnome_iris::reshade::config::{GlobalConfig, ShaderRepo};
 use gnome_iris::reshade::game::{Game, GameSource};
 use gnome_iris::reshade::services::{
-    DefaultGameRepository, DefaultReShadeProvider, DefaultShaderSyncService, GameRepository,
-    ReShadeProvider, ShaderSyncService,
+    DefaultGameRepository, DefaultReShadeProvider, DefaultShaderSyncService, GameRepository, ReShadeProvider,
+    ShaderSyncService,
 };
 use tempfile::tempdir;
 
@@ -54,10 +54,7 @@ async fn download_and_extract_skips_download_when_dll_already_present() {
 
     // The implementation records the version in the update cache after a successful call.
     let installed = UpdateCache::new(dir.path().to_path_buf()).read_installed().unwrap();
-    assert!(
-        installed.contains(&version.to_owned()),
-        "version {version} should be recorded in the update cache"
-    );
+    assert!(installed.contains(&version.to_owned()), "version {version} should be recorded in the update cache");
 }
 
 // ── DefaultGameRepository ────────────────────────────────────────────────────
@@ -93,8 +90,7 @@ fn save_games_persists_to_disk() {
     };
 
     let mut repo = DefaultGameRepository::new(state);
-    let new_games =
-        vec![Game::new("Cyberpunk 2077".into(), PathBuf::from("/games/cp2077"), GameSource::Manual)];
+    let new_games = vec![Game::new("Cyberpunk 2077".into(), PathBuf::from("/games/cp2077"), GameSource::Manual)];
     repo.save_games(&new_games).unwrap();
 
     let reloaded = AppState::load_from(dir.path().to_path_buf());

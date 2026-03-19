@@ -43,8 +43,7 @@ mod tests {
     fn unknown_locale_falls_back_to_english() {
         let zh_cn: LanguageIdentifier = "zh-CN".parse().expect("valid lang id");
         let loader = fluent_language_loader!();
-        i18n_embed::select(&loader, &super::Localizations, &[zh_cn])
-            .expect("select failed");
+        i18n_embed::select(&loader, &super::Localizations, &[zh_cn]).expect("select failed");
         assert_eq!(loader.get("app-title"), "Iris");
     }
 }

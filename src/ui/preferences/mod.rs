@@ -177,7 +177,10 @@ impl SimpleComponent for Preferences {
                 panel_versions::Signal::RemoveVersionRequested(v) => Controls::VersionRemoveRequested(v),
             });
 
-        let model = Self { config: init.config, versions };
+        let model = Self {
+            config: init.config,
+            versions,
+        };
         let widgets = view_output!();
 
         widgets.merge_row.connect_active_notify({
