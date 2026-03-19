@@ -20,6 +20,10 @@ pub enum Controls {
         data_dir: PathBuf,
         /// Game directory to install into.
         game_dir: PathBuf,
+        /// Stable game ID (SHA-512 hex) used to name the per-game shader directory.
+        game_id: String,
+        /// Repository local names that are disabled for this game.
+        disabled_repos: Vec<String>,
         /// DLL override to use.
         dll: DllOverride,
         /// Executable architecture.
@@ -29,8 +33,12 @@ pub enum Controls {
     },
     /// Remove `ReShade` from the given game directory.
     Uninstall {
+        /// App data directory (needed to clean up the per-game shader directory).
+        data_dir: PathBuf,
         /// Game directory to uninstall from.
         game_dir: PathBuf,
+        /// Stable game ID used to locate the per-game shader directory.
+        game_id: String,
         /// The DLL override currently in use.
         dll: DllOverride,
     },
@@ -92,17 +100,26 @@ impl<S: ReShadeProvider> Worker for InstallWorker<S> {
             Controls::Install {
                 data_dir,
                 game_dir,
+                game_id,
+                disabled_repos,
                 dll,
                 arch,
                 version,
             } => {
                 relm4::spawn(async move {
-                    if let Err(e) = do_install(&data_dir, &game_dir, dll, arch, &version, &sender) {
+                    if let Err(e) =
+                        do_install(&data_dir, &game_dir, &game_id, &disabled_repos, dll, arch, &version, &sender)
+                    {
                         sender.output(Signal::Error(e.to_string())).ok();
                     }
                 });
             },
-            Controls::Uninstall { game_dir, dll } => match install::uninstall_reshade(&game_dir, dll) {
+            Controls::Uninstall {
+                data_dir,
+                game_dir,
+                game_id,
+                dll,
+            } => match install::uninstall_reshade(&game_dir, dll, &data_dir, &game_id) {
                 Ok(()) => {
                     sender.output(Signal::UninstallComplete).ok();
                 },
@@ -153,9 +170,12 @@ mod tests {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn do_install(
     data_dir: &std::path::Path,
     game_dir: &std::path::Path,
+    game_id: &str,
+    disabled_repos: &[String],
     dll: DllOverride,
     arch: ExeArch,
     version: &str,
@@ -172,7 +192,7 @@ fn do_install(
     d3dcompiler::ensure(data_dir, arch).context("Failed to install d3dcompiler_47.dll")?;
 
     sender.output(Signal::Progress(ProgressEvent::Installing)).ok();
-    install::install_reshade(data_dir, game_dir, version, dll, arch)?;
+    install::install_reshade(data_dir, game_dir, game_id, disabled_repos, version, dll, arch)?;
 
     // cache.add_installed intentionally omitted: the version is already
     // registered in the cache from the Preferences download step.

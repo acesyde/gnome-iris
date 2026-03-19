@@ -10,6 +10,7 @@ use crate::ui::worker_types::ProgressEvent;
 use crate::ui::{add_shader_repo_dialog, shader_catalog, shader_worker};
 
 use super::Window;
+use super::panel_games;
 
 /// Messages handled by the Shaders panel.
 #[derive(Debug)]
@@ -66,8 +67,17 @@ pub(super) fn handle_progress(model: &Window, event: &ProgressEvent) {
 }
 
 /// Notify the catalog that a sync completed.
+///
+/// If a game detail pane is currently open, also refreshes its shader toggle
+/// list so the newly downloaded repo appears immediately without navigation.
 pub(super) fn handle_sync_complete(model: &Window) {
     model.shader_catalog.emit(shader_catalog::Controls::SyncComplete);
+
+    if let Some(id) = model.current_game_id.clone()
+        && let Some(game) = model.games.iter().find(|g| g.id == id)
+    {
+        panel_games::send_shader_data(model, &game.id, &game.shader_overrides);
+    }
 }
 
 /// Notify the catalog that a sync failed.
@@ -78,7 +88,9 @@ pub(super) fn handle_sync_error(model: &Window, e: String) {
 /// Present the Add Custom Repo dialog, pre-loading existing URLs for duplicate detection.
 pub(super) fn handle_add_custom_repo_requested(model: &Window, root: &adw::ApplicationWindow) {
     let existing_urls = model.app_state.config.shader_repos.iter().map(|r| r.url.clone()).collect();
-    model.add_shader_repo_dialog.emit(add_shader_repo_dialog::Controls::UpdateExistingUrls(existing_urls));
+    model
+        .add_shader_repo_dialog
+        .emit(add_shader_repo_dialog::Controls::UpdateExistingUrls(existing_urls));
     model.add_shader_repo_dialog.widget().present(Some(root));
 }
 

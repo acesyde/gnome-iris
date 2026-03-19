@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 use crate::reshade::config::ShaderRepo;
-use crate::reshade::paths::{MERGED_DIR, RESHADE_SHADERS_DIR};
+use crate::reshade::paths::{GAME_SHADER_DIR_PREFIX, GAME_SHADERS_DIR, MERGED_DIR, RESHADE_SHADERS_DIR};
 
 /// Clones or updates a shader repository.
 ///
@@ -120,6 +120,75 @@ pub fn merged_textures_dir(base: &Path) -> PathBuf {
     base.join(RESHADE_SHADERS_DIR).join(MERGED_DIR).join("Textures")
 }
 
+/// Returns the path to the per-game merged shader directory.
+///
+/// Uses the first 16 characters of `game_id` (64 bits of the SHA-512 hex) to
+/// keep directory names short while remaining collision-resistant for any
+/// realistic local game list.
+///
+/// The directory may or may not exist yet.
+#[must_use]
+pub fn game_merged_dir(data_dir: &Path, game_id: &str) -> PathBuf {
+    let short_id = &game_id[..game_id.len().min(16)];
+    data_dir.join(GAME_SHADERS_DIR).join(format!("{GAME_SHADER_DIR_PREFIX}{short_id}"))
+}
+
+/// Rebuilds the per-game shader directory at
+/// `{data_dir}/ReShade_shaders/game-{game_id}/`.
+///
+/// Wipes and recreates the `Shaders/` and `Textures/` sub-directories (all
+/// content is symlinks, never original data), then re-populates them from all
+/// enabled shader repositories using first-wins priority.  Repositories whose
+/// `local_name` appears in `disabled_repos` are skipped, as are the global
+/// [`MERGED_DIR`] and any other per-game directories.
+///
+/// Returns the path to the per-game root so callers can symlink it into the
+/// game directory.
+///
+/// # Errors
+/// Returns an error if directory creation, removal, or symlinking fails.
+pub fn rebuild_game_merged(data_dir: &Path, game_id: &str, disabled_repos: &[String]) -> Result<PathBuf> {
+    let per_game_dir = game_merged_dir(data_dir, game_id);
+    let shaders_dest = per_game_dir.join("Shaders");
+    let textures_dest = per_game_dir.join("Textures");
+
+    // Wipe and recreate sub-dirs so stale symlinks from previously-enabled
+    // repos don't linger after a toggle.
+    for sub in [&shaders_dest, &textures_dest] {
+        if sub.exists() {
+            std::fs::remove_dir_all(sub).with_context(|| format!("Cannot clear {}", sub.display()))?;
+        }
+        std::fs::create_dir_all(sub).with_context(|| format!("Cannot create {}", sub.display()))?;
+    }
+
+    let repos_dir = data_dir.join(RESHADE_SHADERS_DIR);
+    if !repos_dir.exists() {
+        return Ok(per_game_dir);
+    }
+
+    let entries = std::fs::read_dir(&repos_dir)
+        .context("Cannot read ReShade_shaders dir")?
+        .flatten()
+        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            name != MERGED_DIR && !disabled_repos.contains(&name)
+        });
+
+    for entry in entries {
+        let shaders_src = entry.path().join("Shaders");
+        let textures_src = entry.path().join("Textures");
+        if shaders_src.exists() {
+            link_shader_files(&shaders_src, &shaders_dest)?;
+        }
+        if textures_src.exists() {
+            link_shader_files(&textures_src, &textures_dest)?;
+        }
+    }
+
+    Ok(per_game_dir)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,6 +228,63 @@ mod tests {
         // Should still point to src1 version (first wins)
         let target = std::fs::read_link(merged.join("common.fx")).unwrap();
         assert!(target.to_string_lossy().contains("repo1"), "expected repo1, got: {}", target.display());
+    }
+
+    #[test]
+    fn game_merged_dir_path_contains_prefix() {
+        use std::path::Path;
+        let data_dir = Path::new("/tmp/data");
+        let dir = game_merged_dir(data_dir, "abc123");
+        assert!(dir.to_string_lossy().contains("game-abc123"));
+    }
+
+    #[test]
+    fn rebuild_game_merged_creates_shaders_for_enabled_repo() {
+        let dir = tempdir().unwrap();
+        let data_dir = dir.path();
+        let repo_shaders = data_dir.join("ReShade_shaders/my-repo/Shaders");
+        std::fs::create_dir_all(&repo_shaders).unwrap();
+        std::fs::write(repo_shaders.join("cool.fx"), "// shader").unwrap();
+
+        let per_game = rebuild_game_merged(data_dir, "game1", &[]).unwrap();
+
+        let link = per_game.join("Shaders/cool.fx");
+        assert!(link.exists(), "shader symlink should exist");
+        assert!(link.is_symlink(), "should be a symlink");
+    }
+
+    #[test]
+    fn rebuild_game_merged_excludes_disabled_repos() {
+        let dir = tempdir().unwrap();
+        let data_dir = dir.path();
+        let enabled_shaders = data_dir.join("ReShade_shaders/enabled-repo/Shaders");
+        let disabled_shaders = data_dir.join("ReShade_shaders/disabled-repo/Shaders");
+        std::fs::create_dir_all(&enabled_shaders).unwrap();
+        std::fs::create_dir_all(&disabled_shaders).unwrap();
+        std::fs::write(enabled_shaders.join("good.fx"), "// good").unwrap();
+        std::fs::write(disabled_shaders.join("bad.fx"), "// bad").unwrap();
+
+        let per_game = rebuild_game_merged(data_dir, "game1", &["disabled-repo".to_owned()]).unwrap();
+
+        assert!(per_game.join("Shaders/good.fx").exists());
+        assert!(!per_game.join("Shaders/bad.fx").exists());
+    }
+
+    #[test]
+    fn rebuild_game_merged_clears_stale_symlinks() {
+        let dir = tempdir().unwrap();
+        let data_dir = dir.path();
+        let repo_shaders = data_dir.join("ReShade_shaders/my-repo/Shaders");
+        std::fs::create_dir_all(&repo_shaders).unwrap();
+        std::fs::write(repo_shaders.join("stale.fx"), "// shader").unwrap();
+
+        // First build: repo is enabled.
+        let per_game = rebuild_game_merged(data_dir, "game1", &[]).unwrap();
+        assert!(per_game.join("Shaders/stale.fx").exists());
+
+        // Second build: repo is now disabled — stale link must disappear.
+        rebuild_game_merged(data_dir, "game1", &["my-repo".to_owned()]).unwrap();
+        assert!(!per_game.join("Shaders/stale.fx").exists(), "stale symlink should be removed");
     }
 
     #[test]

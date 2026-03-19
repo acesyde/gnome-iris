@@ -50,7 +50,7 @@ fn extract_then_install_then_detect_then_uninstall() {
     assert!(version_dir.join("ReShade32.dll").exists(), "ReShade32.dll should be extracted");
 
     // Step 2: Install ReShade into the game directory.
-    install_reshade(base.path(), game_dir.path(), version, dll, arch).unwrap();
+    install_reshade(base.path(), game_dir.path(), "testgame", &[], version, dll, arch).unwrap();
 
     assert!(game_dir.path().join("dxgi.dll").is_symlink(), "dxgi.dll symlink missing after install");
     assert!(
@@ -73,13 +73,10 @@ fn extract_then_install_then_detect_then_uninstall() {
     );
 
     // Step 4: Uninstall.
-    uninstall_reshade(game_dir.path(), dll).unwrap();
+    uninstall_reshade(game_dir.path(), dll, base.path(), "testgame").unwrap();
 
     assert!(!game_dir.path().join("dxgi.dll").exists(), "dxgi.dll should be gone after uninstall");
-    assert!(
-        !game_dir.path().join("d3dcompiler_47.dll").exists(),
-        "d3dcompiler_47.dll should be gone after uninstall"
-    );
+    assert!(!game_dir.path().join("d3dcompiler_47.dll").exists(), "d3dcompiler_47.dll should be gone after uninstall");
 
     // Step 5: Detect status → NotInstalled.
     let status_after = detect_install_status(game_dir.path());
@@ -112,7 +109,7 @@ fn x86_install_uses_reshade32_dll() {
     let dll = DllOverride::D3d9;
     setup_version(base.path(), version, arch);
 
-    install_reshade(base.path(), game_dir.path(), version, dll, arch).unwrap();
+    install_reshade(base.path(), game_dir.path(), "testgame", &[], version, dll, arch).unwrap();
 
     let status = detect_install_status(game_dir.path());
     assert!(

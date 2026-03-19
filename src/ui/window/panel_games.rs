@@ -8,6 +8,7 @@ use relm4::adw::prelude::*;
 
 use crate::reshade::app_state::iris_data_dir;
 use crate::reshade::catalog::KNOWN_REPOS;
+use crate::reshade::config::ShaderOverrides;
 use crate::reshade::game::{DllOverride, ExeArch, Game, GameSource, InstallStatus};
 use crate::ui::worker_types::ProgressEvent;
 use crate::ui::{add_game_dialog, game_detail, game_list, install_worker};
@@ -120,32 +121,47 @@ pub(super) fn handle(model: &mut Window, msg: GamesMsg, root: &adw::ApplicationW
 pub(super) fn handle_game_selected(model: &mut Window, id: String) {
     if let Some(game) = model.games.iter().find(|g| g.id == id).cloned() {
         model.game_detail.emit(game_detail::Controls::SetGame(game.clone()));
-        let repos_dir = model.app_state.data_dir.join("ReShade_shaders");
-        let known_names: std::collections::HashSet<&str> = KNOWN_REPOS.iter().map(|e| e.local_name.as_str()).collect();
-        let downloaded_repos = KNOWN_REPOS
-            .iter()
-            .filter(|e| repos_dir.join(&e.local_name).is_dir())
-            .map(crate::reshade::catalog::CatalogEntry::to_shader_repo)
-            .chain(
-                model
-                    .app_state
-                    .config
-                    .shader_repos
-                    .iter()
-                    .filter(|r| !known_names.contains(r.local_name.as_str()) && repos_dir.join(&r.local_name).is_dir())
-                    .cloned(),
-            )
-            .collect();
-        model.game_detail.emit(game_detail::Controls::SetShaderData {
-            repos: downloaded_repos,
-            overrides: game.shader_overrides,
-        });
+        send_shader_data(model, &game.id, &game.shader_overrides);
         model
             .game_detail
             .emit(game_detail::Controls::SetInstalledVersions(model.installed_versions.clone()));
         model.nav_view.push(model.game_detail.widget());
         model.current_game_id = Some(id);
     }
+}
+
+/// Sends the current downloaded shader repo list and per-game overrides to the
+/// detail pane.
+///
+/// Used both when navigating to a game and when a shader sync completes while
+/// the detail pane is already open.
+pub(super) fn send_shader_data(model: &Window, game_id: &str, overrides: &ShaderOverrides) {
+    let repos_dir = model.app_state.data_dir.join("ReShade_shaders");
+    let known_names: std::collections::HashSet<&str> = KNOWN_REPOS.iter().map(|e| e.local_name.as_str()).collect();
+    let downloaded_repos = KNOWN_REPOS
+        .iter()
+        .filter(|e| repos_dir.join(&e.local_name).is_dir())
+        .map(crate::reshade::catalog::CatalogEntry::to_shader_repo)
+        .chain(
+            model
+                .app_state
+                .config
+                .shader_repos
+                .iter()
+                .filter(|r| !known_names.contains(r.local_name.as_str()) && repos_dir.join(&r.local_name).is_dir())
+                .cloned(),
+        )
+        // Exclude per-game dirs that happen to share the prefix used for repo names.
+        .filter(|r| {
+            use crate::reshade::paths::GAME_SHADER_DIR_PREFIX;
+            !r.local_name.starts_with(GAME_SHADER_DIR_PREFIX)
+        })
+        .collect();
+    model.game_detail.emit(game_detail::Controls::SetShaderData {
+        repos: downloaded_repos,
+        overrides: overrides.clone(),
+    });
+    let _ = game_id; // retained for future per-game filtering if needed
 }
 
 /// Dispatch an install job to the worker using the pre-cached version.
@@ -155,6 +171,8 @@ pub(super) fn handle_install(model: &Window, game_id: &str, dll: DllOverride, ar
         model.install_worker.emit(install_worker::Controls::Install {
             data_dir,
             game_dir: game.path.clone(),
+            game_id: game.id.clone(),
+            disabled_repos: game.shader_overrides.disabled_repos.clone(),
             dll,
             arch,
             version,
@@ -166,7 +184,9 @@ pub(super) fn handle_install(model: &Window, game_id: &str, dll: DllOverride, ar
 pub(super) fn handle_uninstall(model: &Window, game_id: &str, dll: DllOverride) {
     if let Some(game) = model.games.iter().find(|g| g.id == game_id) {
         model.install_worker.emit(install_worker::Controls::Uninstall {
+            data_dir: iris_data_dir(),
             game_dir: game.path.clone(),
+            game_id: game.id.clone(),
             dll,
         });
     }
@@ -246,9 +266,9 @@ pub(super) fn handle_game_remove(model: &mut Window, id: String) {
     model.game_list.emit(game_list::Controls::RemoveGame(id));
 }
 
-/// Persist a per-game shader repo toggle.
+/// Persist a per-game shader repo toggle and rebuild the per-game shader directory.
 pub(super) fn handle_shader_toggled(model: &mut Window, game_id: &str, repo_name: &str, enabled: bool) {
-    let update = |overrides: &mut crate::reshade::config::ShaderOverrides| {
+    let update = |overrides: &mut ShaderOverrides| {
         if enabled {
             overrides.disabled_repos.retain(|r| r != repo_name);
         } else if !overrides.disabled_repos.contains(&repo_name.to_owned()) {
@@ -262,6 +282,18 @@ pub(super) fn handle_shader_toggled(model: &mut Window, game_id: &str, repo_name
     if let Some(game) = model.app_state.games.iter_mut().find(|g| g.id == game_id) {
         update(&mut game.shader_overrides);
         model.save_or_toast();
+    }
+
+    // Rebuild the per-game shader dir so the toggle takes effect immediately.
+    // This is fast (symlink-only) and safe to run on the main thread.
+    if let Some(game) = model.games.iter().find(|g| g.id == game_id)
+        && let Err(e) = crate::reshade::shaders::rebuild_game_merged(
+            &model.app_state.data_dir,
+            &game.id,
+            &game.shader_overrides.disabled_repos,
+        )
+    {
+        log::warn!("Shader rebuild failed for game {game_id}: {e}");
     }
 }
 

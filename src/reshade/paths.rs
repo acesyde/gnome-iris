@@ -29,6 +29,16 @@ pub const CONFIG_FILE: &str = "config.json";
 /// Located at `$XDG_DATA_HOME/iris/games.json`.
 pub const GAMES_FILE: &str = "games.json";
 
+/// Directory that holds per-game merged shader trees.
+///
+/// Located at `$XDG_DATA_HOME/iris/Game_shaders/`.
+pub const GAME_SHADERS_DIR: &str = "Game_shaders";
+
+/// Prefix for per-game shader directories inside [`GAME_SHADERS_DIR`].
+///
+/// A full per-game directory is `{GAME_SHADERS_DIR}/game-{short_game_id}/`.
+pub const GAME_SHADER_DIR_PREFIX: &str = "game-";
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -56,5 +66,15 @@ mod tests {
     #[test]
     fn games_file_value() {
         assert_eq!(GAMES_FILE, "games.json");
+    }
+
+    #[test]
+    fn game_shaders_dir_value() {
+        assert_eq!(GAME_SHADERS_DIR, "Game_shaders");
+    }
+
+    #[test]
+    fn game_shader_dir_prefix_value() {
+        assert_eq!(GAME_SHADER_DIR_PREFIX, "game-");
     }
 }
